@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>MathMaster PRO | أ. أشرف جميل</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="المحترف رياضيات" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <!-- مكتبة مسح الباركود -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <style>
+      :root {
+        --primary: #0f172a;
+        --accent: #3b82f6;
+        --surface: #ffffff;
+        --bg: #f8fafc;
+      }
+      body { 
+        font-family: 'Cairo', sans-serif; 
+        background-color: #f8fafc; 
+        color: #0f172a;
+        user-select: none; 
+        overflow-x: hidden;
+      }
+      .premium-card {
+        background: white;
+        border-radius: 2.5rem;
+        border: 1px solid rgba(0,0,0,0.03);
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      .premium-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.12);
+        border-color: rgba(59, 130, 246, 0.2);
+      }
+      .glass-nav {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+      }
+      .hero-gradient {
+        background: radial-gradient(circle at top right, #1e293b, #0f172a);
+      }
+      .math-pattern {
+        background-image: radial-gradient(circle at 2px 2px, rgba(59, 130, 246, 0.05) 1px, transparent 0);
+        background-size: 32px 32px;
+      }
+      .animate-float {
+        animation: float 6s ease-in-out infinite;
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-15px) rotate(2deg); }
+      }
+      .btn-premium {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        border-radius: 1.5rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.3);
+      }
+      .btn-premium:hover {
+        box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.5);
+        transform: scale(1.02);
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      
+      /* تحسين عرض الكاميرا */
+      #qr-reader video {
+        border-radius: 2rem !important;
+        object-fit: cover !important;
+      }
+      #qr-reader {
+        border: none !important;
+      }
+
+      @media (display-mode: standalone) {
+        .glass-nav { padding-top: env(safe-area-inset-top); }
+        main { padding-bottom: env(safe-area-inset-bottom); }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="math-pattern">
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('MathMaster PWA Active:', reg.scope);
+          }).catch(err => {
+            console.log('SW Registration failed:', err);
+          });
+        });
+      }
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
