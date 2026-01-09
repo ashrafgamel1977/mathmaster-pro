@@ -9,7 +9,7 @@ import {
 // الواجهات
 import dashboard from './views/dashboard';
 
-import StudentList from './components/StudentList';
+
 import StudentPortal from './views/StudentPortal';
 import ParentPortal from './views/ParentPortal';
 import QuizResults from './views/QuizResults';
@@ -259,7 +259,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case AppView.dASHBOARD: return <dashboard teacherName={settings.teacherName} students={students} quizzes={quizzes} assignments={assignments} submissions={submissions} onNavigate={setCurrentView} />;
-      case AppView.STUDENTS: return <StudentList students={students} groups={groups} years={years} notifications={notifications} onAttendanceChange={handleAttendanceChange} onSendAlert={() => {}} onDeleteStudent={(id) => setStudents(prev => prev.filter(s => s.id !== id))} onResetDevice={(id) => setStudents(prev => prev.map(s => s.id === id ? { ...s, deviceIds: [] } : s))} onAddStudent={(s) => setStudents(prev => [...prev, s])} onUpdateStudent={(id, updates) => setStudents(prev => prev.map(s => s.id === id ? {...s, ...updates} : s))} teacherName={settings.teacherName} />;
+     
       case AppView.SCHEDULE: return <Schedules groups={groups} schedules={schedules} onAdd={(e) => setSchedules(prev => [...prev, { ...e, id: 'sch'+Date.now() }])} onDelete={(id) => setSchedules(prev => prev.filter(s => s.id !== id))} />;
       case AppView.FORMULAS: return <Formulas years={years} formulas={formulas} onAdd={(f) => setFormulas(prev => [...prev, { ...f, id: 'f'+Date.now() }])} onDelete={(id) => setFormulas(prev => prev.filter(f => f.id !== id))} />;
       case AppView.MANAGEMENT: return <Management years={years} groups={groups} students={students} onAddYear={(n) => setYears(prev => [...prev, { id: 'y'+Date.now(), name: n }])} onAddGroup={(n, y, t, ty, g, c, p) => setGroups(prev => [...prev, { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p, joinCode: (p || 'GRP') + Math.random().toString(36).substr(2,3).toUpperCase() }])} onDeleteGroup={(id) => setGroups(prev => prev.filter(g => g.id !== id))} teacherName={settings.teacherName} platformName={settings.platformName} onBatchGenerateCodes={(gid) => { setStudents(prev => prev.map(s => s.groupId === gid && s.studentCode === 'PENDING' ? {...s, studentCode: (groups.find(g=>g.id===gid)?.codePrefix || 'M') + Math.floor(1000 + Math.random() * 9000), status: 'active'} : s)); addToast(`تم تفعيل الطلاب بنجاح! 🔑`, 'success'); }} />;
