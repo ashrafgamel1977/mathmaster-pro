@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // الواجهات
-import dashboard from './views/Dashboard';
+import dashboard from './views/dashboard';
 import Sidebar from './components/Sidebar';
 import StudentList from './components/StudentList';
 import StudentPortal from './views/StudentPortal';
