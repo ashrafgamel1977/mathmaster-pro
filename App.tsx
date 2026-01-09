@@ -8,7 +8,7 @@ import {
 
 // الواجهات
 import dashboard from './views/dashboard';
-import Sidebar from './components/Sidebar';
+
 import StudentList from './components/StudentList';
 import StudentPortal from './views/StudentPortal';
 import ParentPortal from './views/ParentPortal';
@@ -258,7 +258,7 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case AppView.DASHBOARD: return <Dashboard teacherName={settings.teacherName} students={students} quizzes={quizzes} assignments={assignments} submissions={submissions} onNavigate={setCurrentView} />;
+      case AppView.dASHBOARD: return <dashboard teacherName={settings.teacherName} students={students} quizzes={quizzes} assignments={assignments} submissions={submissions} onNavigate={setCurrentView} />;
       case AppView.STUDENTS: return <StudentList students={students} groups={groups} years={years} notifications={notifications} onAttendanceChange={handleAttendanceChange} onSendAlert={() => {}} onDeleteStudent={(id) => setStudents(prev => prev.filter(s => s.id !== id))} onResetDevice={(id) => setStudents(prev => prev.map(s => s.id === id ? { ...s, deviceIds: [] } : s))} onAddStudent={(s) => setStudents(prev => [...prev, s])} onUpdateStudent={(id, updates) => setStudents(prev => prev.map(s => s.id === id ? {...s, ...updates} : s))} teacherName={settings.teacherName} />;
       case AppView.SCHEDULE: return <Schedules groups={groups} schedules={schedules} onAdd={(e) => setSchedules(prev => [...prev, { ...e, id: 'sch'+Date.now() }])} onDelete={(id) => setSchedules(prev => prev.filter(s => s.id !== id))} />;
       case AppView.FORMULAS: return <Formulas years={years} formulas={formulas} onAdd={(f) => setFormulas(prev => [...prev, { ...f, id: 'f'+Date.now() }])} onDelete={(id) => setFormulas(prev => prev.filter(f => f.id !== id))} />;
@@ -357,7 +357,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] flex overflow-hidden font-['Cairo']" dir="rtl">
-      <Sidebar currentView={currentView} setView={setCurrentView} settings={settings} loggedUser={loggedUser} onUpdateSettings={setSettings} addToast={addToast} />
+    
       <main className="flex-1 overflow-y-auto bg-slate-50/30">
         <div className="p-4 lg:p-12 max-w-7xl mx-auto">{renderTeacherView()}</div>
       </main>
