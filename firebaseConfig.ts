@@ -10,7 +10,7 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 // ============================================================================
 
 const PERMANENT_CONFIG = {
-  // --- امسح هذا السطر وما تحته والصق بياناتك الحقيقية هنا ---
+
   apiKey:"AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",  
   authDomain: "mathmaster-pri.firebaseapp.com",  
   projectId: "mathmaster-pri",  
