@@ -1,8 +1,9 @@
 {
   "requestFramePermissions": [
     "camera",
-    "microphone"
+    "microphone",
+    "geolocation"
   ],
   "name": "MathMaster Pro",
-  "description": "المنصة التعليمية المتكاملة للأستاذ أشرف جميل"
+  "description": "المنصة التعليمية المتكاملة للأستاذ أشرف جميل لتعليم الرياضيات بالذكاء الاصطناعي"
 }

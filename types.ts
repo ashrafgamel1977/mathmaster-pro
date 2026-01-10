@@ -110,7 +110,7 @@ export interface Group {
   codePrefix?: string;
 }
 export interface Quiz { id: string; title: string; yearId: string; date: string; type: string; questions?: any[]; }
-export interface QuizResult { id: string; studentId: string; quizId: string; quizTitle: string; score: number; status: 'pending' | 'graded'; date: string; handwrittenUrl?: string; aiFeedback?: string; }
+export interface QuizResult { id: string; studentId: string; quizId: string; quizTitle: string; score: number; status: 'pending' | 'graded'; date: string; handwrittenUrl?: string; aiFeedback?: string; feedback?: string; }
 
 export interface Assignment {
   id: string;

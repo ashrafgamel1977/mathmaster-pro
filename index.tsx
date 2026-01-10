@@ -1,7 +1,7 @@
-
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -11,17 +11,15 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// إضافة معالج أخطاء بسيط لضمان تجربة مستخدم مستقرة
-// Fix: Explicitly extending React.Component and declaring state property for full TypeScript support
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Fix: Explicitly declare the props and state properties to solve 'Property ... does not exist' errors
-  props: ErrorBoundaryProps;
-  state: ErrorBoundaryState = { hasError: false };
+// Fixed ErrorBoundary by using explicit Component import and property definitions to resolve TS errors.
+// This ensures that TypeScript correctly recognizes 'state' and 'props' as members of the class.
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Explicitly declare state as a property to fix TS error: Property 'state' does not exist on type 'ErrorBoundary' (Lines 20, 33)
+  public state: ErrorBoundaryState = { hasError: false };
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.props = props;
-    this.state = { hasError: false };
+    // State is initialized above as a class property
   }
 
   static getDerivedStateFromError(_error: any): ErrorBoundaryState {
@@ -33,19 +31,19 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   render() {
-    // Standard access to state with class component syntax
+    // Accessing this.state is now recognized by TypeScript after explicit declaration above
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-10 text-right" dir="rtl">
           <div className="space-y-6">
-            <h1 className="text-4xl font-black">عذراً، حدث خطأ تقني غير متوقع ⚠️</h1>
-            <p className="text-slate-400">يرجى إعادة تحميل الصفحة. إذا استمرت المشكلة، تأكد من اتصال الإنترنت.</p>
-            <button onClick={() => window.location.reload()} className="px-8 py-4 bg-blue-600 rounded-2xl font-black shadow-xl">تحديث الصفحة</button>
+            <h1 className="text-4xl font-black">عذراً، حدث خطأ تقني ⚠️</h1>
+            <p className="text-slate-400">يرجى إعادة تحميل الصفحة.</p>
+            <button onClick={() => window.location.reload()} className="px-8 py-4 bg-blue-600 rounded-2xl font-black shadow-xl">تحديث</button>
           </div>
         </div>
       );
     }
-    // Standard access to props children
+    // Accessing this.props.children is now recognized correctly by TypeScript (Line 45)
     return this.props.children;
   }
 }
