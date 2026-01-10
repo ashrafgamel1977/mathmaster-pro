@@ -12,9 +12,10 @@ interface DashboardProps {
   settings?: PlatformSettings;
   onNavigate?: (view: AppView) => void;
   loggedUser?: any;
+  isConnected?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ teacherName, platformName = "MathMaster Pro", students, quizzes, assignments, submissions, settings, onNavigate, loggedUser }) => {
+const Dashboard: React.FC<DashboardProps> = ({ teacherName, platformName = "MathMaster Pro", students, quizzes, assignments, submissions, settings, onNavigate, loggedUser, isConnected = false }) => {
   const [isProMode, setIsProMode] = useState(false);
   const isAssistant = loggedUser?.role === 'assistant';
   const permissions = isAssistant ? (loggedUser as Assistant).permissions : Object.values(AppView);
@@ -55,15 +56,22 @@ const Dashboard: React.FC<DashboardProps> = ({ teacherName, platformName = "Math
         <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
           <div className="flex-1 space-y-8 text-center lg:text-right">
             <div className="flex flex-wrap justify-center lg:justify-start gap-3">
-               <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 backdrop-blur-2xl rounded-full border border-white/10">
+               {/* Cloud Sync Indicator */}
+               <div className={`inline-flex items-center gap-3 px-6 py-2 backdrop-blur-2xl rounded-full border transition-colors ${isConnected ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isConnected ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                   </span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">
-                      MathMaster Intelligence Active {isProMode && "• PREMIUM"}
+                  <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${isConnected ? 'text-emerald-200' : 'text-rose-200'}`}>
+                      {isConnected ? 'تم الحفظ سحابياً (آمن)' : 'غير متصل (بيانات مؤقتة)'}
                   </span>
                </div>
+               
+               {isProMode && (
+                 <div className="inline-flex items-center gap-3 px-6 py-2 bg-blue-500/10 backdrop-blur-2xl rounded-full border border-blue-500/20">
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">AI Premium</span>
+                 </div>
+               )}
                
                {settings?.integrityMode && (
                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500/10 backdrop-blur-2xl rounded-full border border-rose-500/20">
@@ -81,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({ teacherName, platformName = "Math
             </h2>
             
             <p className="text-slate-400 text-lg md:text-xl font-medium max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              منصتك الآن في أبهى صورها. ذكاء اصطناعي، أتمتة كاملة، وتحكم مطلق في كل تفصيلة تعليمية.
+              منصتك الآن في أبهى صورها. ذكاء اصطناعي، أتمتة كاملة، وحفظ تلقائي لكل البيانات في السحابة.
             </p>
 
             <div className="pt-6 flex flex-wrap gap-5 justify-center lg:justify-start">

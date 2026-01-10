@@ -74,6 +74,11 @@ export interface RewardRedemption {
   timestamp: string;
 }
 
+export interface StudentPreferences {
+  customIcons?: Record<string, string>;
+  themeColor?: string;
+}
+
 export interface Student {
   id: string;
   studentCode: string;
@@ -96,6 +101,7 @@ export interface Student {
   balance?: number;
   lastReadNotificationId?: string;
   lastSpinDate?: string;
+  preferences?: StudentPreferences;
 }
 
 export interface Year { id: string; name: string; }

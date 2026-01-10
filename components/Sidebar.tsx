@@ -8,13 +8,13 @@ interface SidebarProps {
   settings: PlatformSettings;
   loggedUser?: any;
   onUpdateSettings: (settings: PlatformSettings) => void;
-  // removed addToast from props interface as it was unused
   pendingCount?: number;
   unreadChatCount?: number;
   unreadNotifCount?: number;
+  isConnected?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, loggedUser, pendingCount = 0, unreadChatCount = 0, unreadNotifCount = 0 }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, loggedUser, pendingCount = 0, unreadChatCount = 0, unreadNotifCount = 0, isConnected = false }) => {
   const isAssistant = loggedUser?.role === 'assistant';
   const assistantPermissions = isAssistant ? (loggedUser as Assistant).permissions : null;
   const primaryColor = settings?.branding?.primaryColor || '#2563eb';
@@ -59,6 +59,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, logge
         ) : (
            <div className="w-16 h-16 rounded-3xl flex items-center justify-center text-white font-black text-3xl transform group-hover:rotate-12 transition-transform duration-500" style={{ backgroundColor: primaryColor }}>∑</div>
         )}
+        {/* مؤشر حالة الاتصال */}
+        <div className="absolute -bottom-2 right-1/2 translate-x-1/2 flex items-center justify-center">
+           <div className={`w-3 h-3 rounded-full border-2 border-[#0f172a] ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-rose-500 animate-pulse'}`} title={isConnected ? "متصل بقاعدة البيانات" : "غير متصل"}></div>
+        </div>
       </div>
 
       <nav className="flex-1 w-full space-y-4 px-3 pb-10">

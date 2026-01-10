@@ -36,7 +36,8 @@ interface AdminControlPanelProps {
   quizzes: Quiz[];
   assignments: Assignment[];
   onUpdateSettings: (s: PlatformSettings) => void;
-  onUpdateAssistants: (a: Assistant[]) => void;
+  onAddAssistant: (a: Assistant) => void;
+  onDeleteAssistant: (id: string) => void;
   onAddYear: (n: string) => void;
   onAddGroup: (n: string, y: string, t: string, ty: 'center' | 'online', g: 'boys' | 'girls' | 'mixed', c: number, p: string) => void;
   onDeleteGroup: (id: string) => void;
@@ -143,7 +144,7 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
           />
         );
       case 'settings':
-        return <Settings settings={props.settings} assistants={props.assistants} onUpdate={props.onUpdateSettings} onUpdateAssistants={props.onUpdateAssistants} />;
+        return <Settings settings={props.settings} assistants={props.assistants} onUpdate={props.onUpdateSettings} onAddAssistant={props.onAddAssistant} onDeleteAssistant={props.onDeleteAssistant} />;
       case 'tech':
         return (
           <div className="space-y-12">
@@ -151,7 +152,7 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
               students={props.students} years={props.years} groups={props.groups} quizzes={props.quizzes} assignments={props.assignments} settings={props.settings}
               onMockData={props.onMockData} onEnterSimulation={props.onEnterSimulation} addToast={props.addToast}
             />
-            <div className="border-t border-slate-100 pt-12">
+            <div className="border-t border-slate-120 pt-12">
                <LaunchGuide groups={props.groups} years={props.years} teacherName={props.settings.teacherName} platformName={props.settings.platformName} addToast={props.addToast} />
             </div>
           </div>

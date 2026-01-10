@@ -4,15 +4,16 @@ import React, { useEffect, useRef, useState } from 'react';
 interface AttendanceScannerProps {
   onScan: (code: string) => void;
   onClose: () => void;
-  lastScannedName?: string;
+  scanResult?: { type: 'success' | 'error'; message: string } | null;
 }
 
 declare const Html5QrcodeScanner: any;
 
-const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ onScan, onClose, lastScannedName }) => {
+const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ onScan, onClose, scanResult }) => {
   const scannerRef = useRef<any>(null);
   const onScanRef = useRef(onScan);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [localFeedback, setLocalFeedback] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<boolean>(false);
 
   // Keep the latest onScan function available without re-running the effect
   useEffect(() => {
@@ -22,63 +23,96 @@ const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ onScan, onClose, 
   useEffect(() => {
     // Check if script is loaded
     if (typeof Html5QrcodeScanner === 'undefined') {
-      setFeedback("جاري تحميل مكتبة الماسح...");
+      setLocalFeedback("جاري تحميل مكتبة الماسح...");
       return; 
     }
 
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        showTorchButtonIfSupported: true,
-        rememberLastUsedCamera: true
-      },
-      /* verbose= */ false
-    );
+    let isMounted = true;
 
-    let isScanning = true;
+    const startScanner = async () => {
+        // Ensure DOM element exists
+        if (!document.getElementById("qr-reader")) return;
 
-    const onScanSuccess = (decodedText: string) => {
-      if (!isScanning) return;
-      
-      // Play beep sound
-      try {
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.1);
-      } catch (e) {}
+        // Cleanup any existing instance first
+        if (scannerRef.current) {
+            try {
+                await scannerRef.current.clear();
+            } catch (e) {
+                console.warn("Cleanup error", e);
+            }
+            scannerRef.current = null;
+        }
 
-      // Use ref to call the latest version of the function without restarting the effect
-      onScanRef.current(decodedText);
-      
-      setFeedback("تم القراءة ✓");
-      setTimeout(() => setFeedback(null), 2000);
+        // Small delay to ensure camera stream is released by browser
+        await new Promise(r => setTimeout(r, 300));
+        
+        if (!isMounted) return;
+
+        try {
+            const scanner = new Html5QrcodeScanner(
+              "qr-reader",
+              { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+                showTorchButtonIfSupported: true,
+                rememberLastUsedCamera: true,
+                videoConstraints: {
+                    facingMode: { ideal: "environment" } // Prefer back camera
+                }
+              },
+              /* verbose= */ false
+            );
+
+            scannerRef.current = scanner;
+
+            const onScanSuccess = (decodedText: string) => {
+              // Play beep sound
+              try {
+                const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+              } catch (e) {}
+
+              // Use ref to call the latest version
+              if (onScanRef.current) {
+                  onScanRef.current(decodedText);
+              }
+            };
+
+            scanner.render(onScanSuccess, (errorMessage: any) => {
+               // Determine if it's a permission error based on string content if possible
+               if (errorMessage && typeof errorMessage === 'string' && 
+                  (errorMessage.includes("Permission") || errorMessage.includes("NotAllowedError"))) {
+                   setPermissionError(true);
+               }
+            });
+
+        } catch (e) {
+            console.error("Scanner Init Error", e);
+            setLocalFeedback("حدث خطأ أثناء تشغيل الكاميرا");
+        }
     };
 
-    scanner.render(onScanSuccess, (err: any) => {
-       // ignore errors
-    });
-    
-    scannerRef.current = scanner;
+    startScanner();
 
     return () => {
-      isScanning = false;
+      isMounted = false;
       if (scannerRef.current) {
         scannerRef.current.clear().catch((error: any) => {
           console.error("Failed to clear scanner", error);
         });
+        scannerRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures camera doesn't restart on parent state change
+  }, []); 
 
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-900/95 backdrop-blur-xl flex items-center justify-center p-4 font-['Cairo']" dir="rtl">
@@ -94,20 +128,39 @@ const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ onScan, onClose, 
         </div>
 
         {/* Scanner Area */}
-        <div className="p-0 relative bg-black min-h-[350px]">
+        <div className="p-0 relative bg-black min-h-[350px] flex items-center justify-center">
            <div id="qr-reader" className="w-full h-full bg-black"></div>
            
-           {/* Feedback Overlay */}
-           {feedback && (
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-emerald-500/90 backdrop-blur-md text-white px-8 py-4 rounded-2xl text-center shadow-2xl animate-bounce">
-                <p className="font-black text-sm">{feedback}</p>
+           {/* Permission Error State */}
+           {permissionError && (
+             <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center z-30">
+                <span className="text-4xl mb-4">📷🚫</span>
+                <h4 className="font-bold text-lg mb-2">تعذر الوصول للكاميرا</h4>
+                <p className="text-xs text-slate-400 mb-6">يرجى التأكد من السماح للمتصفح باستخدام الكاميرا من إعدادات الموقع.</p>
+                <button onClick={() => window.location.reload()} className="px-6 py-3 bg-blue-600 rounded-xl font-black text-xs">تحديث الصفحة</button>
              </div>
            )}
 
-           {lastScannedName && (
-             <div className="absolute bottom-6 left-6 right-6 z-20 bg-white/90 backdrop-blur-md text-slate-800 py-3 px-4 rounded-xl text-center shadow-lg border-2 border-emerald-500 animate-slideUp">
-                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">آخر عملية ناجحة</p>
-                <p className="font-black text-sm text-emerald-600">✅ {lastScannedName}</p>
+           {/* Feedback Overlay (Loading) */}
+           {localFeedback && !permissionError && (
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-emerald-500/90 backdrop-blur-md text-white px-8 py-4 rounded-2xl text-center shadow-2xl animate-bounce">
+                <p className="font-black text-sm">{localFeedback}</p>
+             </div>
+           )}
+
+           {/* Scan Result Feedback */}
+           {scanResult && (
+             <div className={`absolute bottom-6 left-6 right-6 z-20 backdrop-blur-md text-slate-800 py-4 px-4 rounded-2xl text-center shadow-2xl border-2 animate-slideUp ${
+               scanResult.type === 'success' 
+                 ? 'bg-white/95 border-emerald-500' 
+                 : 'bg-rose-50/95 border-rose-500 text-rose-800'
+             }`}>
+                <div className="flex flex-col items-center gap-1">
+                   <span className="text-2xl">{scanResult.type === 'success' ? '✅' : '⚠️'}</span>
+                   <p className={`font-black text-sm ${scanResult.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                     {scanResult.message}
+                   </p>
+                </div>
              </div>
            )}
         </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Student, Group, Year, AppNotification } from '../types';
 import AttendanceScanner from './AttendanceScanner';
 
@@ -17,13 +17,16 @@ interface StudentListProps {
   teacherName: string;
 }
 
+const ITEMS_PER_PAGE = 20;
+
 const StudentList: React.FC<StudentListProps> = ({ students, groups, years, notifications, onAttendanceChange, onSendAlert, onDeleteStudent, onResetDevice, onAddStudent, onUpdateStudent, teacherName }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'present' | 'absent' | 'unpaid'>('all');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [showScanner, setShowScanner] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [lastScannedName, setLastScannedName] = useState<string | undefined>(undefined);
+  const [scanResult, setScanResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Form state for manual addition
   const [newStudent, setNewStudent] = useState({
@@ -37,16 +40,33 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
   
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
-      const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || student.studentCode.includes(searchQuery);
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = student.name.toLowerCase().includes(searchLower) || 
+                            student.studentCode.toLowerCase().includes(searchLower);
+      
       let matchesStatus = true;
       if (filterStatus === 'present') matchesStatus = student.attendance;
       else if (filterStatus === 'absent') matchesStatus = !student.attendance;
       else if (filterStatus === 'unpaid') matchesStatus = !student.isPaid;
       
       const matchesGroup = filterGroup === 'all' ? true : student.groupId === filterGroup;
-      return searchQuery ? matchesSearch : (matchesSearch && matchesStatus && matchesGroup);
+      
+      // Combine all filters
+      return matchesSearch && matchesStatus && matchesGroup;
     });
   }, [students, searchQuery, filterStatus, filterGroup]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus, filterGroup]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
+  const currentStudents = filteredStudents.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const hasReadLatest = (student: Student) => {
     const relevantNotifs = notifications.filter(n => n.targetYearId === student.yearId || n.targetStudentId === student.id || n.targetYearId === undefined);
@@ -58,22 +78,22 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
   const handleQuickAttendance = (code: string) => {
     // Trim whitespace and handle potential URL formats if scanner picks up a full URL
     const cleanCode = code.trim();
-    const student = students.find(s => s.studentCode === cleanCode || cleanCode.endsWith(s.studentCode));
+    // Support matching pure code or finding code within URL/String
+    const student = students.find(s => s.studentCode === cleanCode || cleanCode.includes(s.studentCode));
     
     if (student) {
       if (!student.attendance) {
         onAttendanceChange(student.id);
-        setLastScannedName(student.name);
-        // Clear name after delay
-        setTimeout(() => setLastScannedName(undefined), 4000);
+        setScanResult({ type: 'success', message: `تم تسجيل حضور: ${student.name}` });
       } else {
-        setLastScannedName(`(مسجل مسبقاً) ${student.name}`);
-        setTimeout(() => setLastScannedName(undefined), 4000);
+        setScanResult({ type: 'error', message: `(مسجل مسبقاً) ${student.name}` });
       }
     } else {
-       // Optional: Handle unknown code
-       // alert('كود غير معروف: ' + cleanCode);
+       setScanResult({ type: 'error', message: 'كود غير معروف أو طالب غير مسجل' });
     }
+    
+    // Clear message after delay
+    setTimeout(() => setScanResult(null), 3000);
   };
 
   const handleAddSubmit = () => {
@@ -110,7 +130,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
            <h2 className="text-3xl font-black text-slate-800 tracking-tight">إدارة شؤون الطلاب 👥</h2>
            <p className="text-sm text-slate-400 font-bold mt-1">متابعة الحضور، تحصيل المصروفات، وإدارة الأجهزة.</p>
         </div>
-        <div className="flex flex-wrap gap-3 justify-center">
+        <div className="flex flex-wrap gap-3 justify-center items-center">
            <button 
              onClick={() => setShowAddModal(true)}
              className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-2"
@@ -125,6 +145,22 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
              <span>ماسح الحضور</span>
              <span className="text-xl">📸</span>
            </button>
+
+           <div className="relative">
+              <select 
+                value={filterGroup} 
+                onChange={(e) => setFilterGroup(e.target.value)}
+                className="px-6 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all appearance-none pl-10 cursor-pointer min-w-[160px] text-slate-700"
+              >
+                <option value="all">كل المجموعات ({students.length})</option>
+                {groups.map(g => {
+                  const count = students.filter(s => s.groupId === g.id).length;
+                  return <option key={g.id} value={g.id}>{g.name} ({count})</option>;
+                })}
+              </select>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+           </div>
+
            <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
               {['all', 'present', 'unpaid'].map((f) => (
                 <button 
@@ -146,8 +182,15 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
         </div>
       </div>
 
+      <div className="flex justify-between items-center px-4">
+         <p className="text-slate-500 font-bold text-xs">
+           تم العثور على <span className="text-indigo-600 font-black">{filteredStudents.length}</span> طالب
+           {filterGroup !== 'all' && ` في ${groups.find(g => g.id === filterGroup)?.name || 'المجموعة المحددة'}`}
+         </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredStudents.map((student) => {
+        {currentStudents.map((student) => {
           const group = groups.find(g => g.id === student.groupId);
           const isReader = hasReadLatest(student);
           
@@ -202,7 +245,37 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
             </div>
           );
         })}
+        {currentStudents.length === 0 && (
+           <div className="col-span-full py-20 text-center opacity-50">
+              <span className="text-4xl block mb-2">🔍</span>
+              <p className="font-bold text-slate-400">لا توجد نتائج مطابقة للبحث</p>
+           </div>
+        )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-8 pt-8 border-t border-slate-100">
+          <button 
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-6 py-3 bg-white text-slate-600 rounded-2xl font-black text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all border border-slate-200"
+          >
+            السابق
+          </button>
+          
+          <span className="text-sm font-black text-slate-500 bg-slate-100 px-4 py-2 rounded-xl">
+            صفحة {currentPage} من {totalPages}
+          </span>
+          
+          <button 
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-6 py-3 bg-white text-slate-600 rounded-2xl font-black text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all border border-slate-200"
+          >
+            التالي
+          </button>
+        </div>
+      )}
 
       {/* Add Student Modal */}
       {showAddModal && (
@@ -240,7 +313,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, groups, years, noti
         <AttendanceScanner 
           onScan={handleQuickAttendance}
           onClose={() => setShowScanner(false)}
-          lastScannedName={lastScannedName}
+          scanResult={scanResult}
         />
       )}
     </div>
