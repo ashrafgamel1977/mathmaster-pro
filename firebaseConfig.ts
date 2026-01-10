@@ -11,12 +11,12 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 
 const PERMANENT_CONFIG = {
   // --- امسح هذا السطر وما تحته والصق بياناتك الحقيقية هنا ---
-  apiKey: "AIzaSyD-YOUR_API_KEY_HERE", 
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey:"AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",  
+  authDomain: "mathmaster-pri.firebaseapp.com",  
+  projectId: "mathmaster-pri",  
+  storageBucket:"mathmaster-pri.firebasestorage.app",
+  messagingSenderId: "784442354442",  
+  appId:"1:784442354442:web:5a0b4772c144d4e01228f3",  
   // ---------------------------------------------------------
 };
 
