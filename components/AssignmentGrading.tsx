@@ -20,7 +20,6 @@ const AssignmentGrading: React.FC<AssignmentGradingProps> = ({
 }) => {
   const [grade, setGrade] = useState<string>(submission.grade?.toString() || '');
   const [feedback, setFeedback] = useState<string>(submission.feedback || '');
-  const [annotatedImg, setAnnotatedImg] = useState<string | null>(null);
 
   const handleFinalSave = (boardDataUrl: string) => {
     if (!grade) {

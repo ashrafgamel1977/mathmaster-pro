@@ -10,13 +10,13 @@ interface ManagementProps {
   onAddGroup: (name: string, yearId: string, time: string, type: 'center' | 'online', gender: 'boys' | 'girls' | 'mixed', capacity: number, prefix: string) => void;
   onDeleteGroup: (id: string) => void;
   onBatchGenerateCodes?: (groupId: string) => void;
-  teacherName: string;
+  teacherName?: string; // Made optional and unused in logic to prevent errors
   platformName: string;
 }
 
 const Management: React.FC<ManagementProps> = ({ 
   years, groups, students, 
-  onAddYear, onAddGroup, onDeleteGroup, onBatchGenerateCodes, teacherName, platformName 
+  onAddYear, onAddGroup, onDeleteGroup, onBatchGenerateCodes, platformName 
 }) => {
   const [newYear, setNewYear] = useState('');
   const [showCardsForGroup, setShowCardsForGroup] = useState<string | null>(null);
@@ -28,7 +28,7 @@ const Management: React.FC<ManagementProps> = ({
     <div className="space-y-12 animate-slideUp pb-24 text-right font-['Cairo']" dir="rtl">
       <div className="relative overflow-hidden rounded-[4rem] bg-[#0f172a] p-10 md:p-16 text-white shadow-2xl">
         <h2 className="text-3xl md:text-5xl font-black">إدارة الصفوف والمجموعات 🏫</h2>
-        <p className="text-slate-400 font-medium mt-2">قم بتهيئة النظام الدراسي وإصدار بطاقات الطلاب.</p>
+        <p className="text-slate-400 font-medium mt-2">قم بتهيئة النظام الدراسي وإصدار بطاقات QR للطلاب.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -78,7 +78,7 @@ const Management: React.FC<ManagementProps> = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setShowCardsForGroup(g.id)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] shadow-lg flex items-center justify-center gap-2">🪪 كارنيهات الباركود</button>
+                      <button onClick={() => setShowCardsForGroup(g.id)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] shadow-lg flex items-center justify-center gap-2">🪪 كارنيهات QR الذكية</button>
                       <button onClick={() => onBatchGenerateCodes?.(g.id)} className="w-12 h-10 bg-white border border-slate-200 text-indigo-600 rounded-xl flex items-center justify-center">🔑</button>
                     </div>
                     <button onClick={() => onDeleteGroup(g.id)} className="absolute -top-2 -left-2 w-8 h-8 bg-white border border-slate-100 text-rose-400 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md">✕</button>
@@ -94,7 +94,7 @@ const Management: React.FC<ManagementProps> = ({
         <div className="fixed inset-0 z-[500] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-10 animate-fadeIn overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-[3rem] min-h-[90vh] flex flex-col shadow-2xl relative my-10">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-[3rem]">
-              <div><h3 className="text-2xl font-black text-slate-800">إصدار الكارنيهات 🪪</h3></div>
+              <div><h3 className="text-2xl font-black text-slate-800">إصدار كارنيهات QR 🪪</h3></div>
               <div className="flex gap-3">
                 <button onClick={() => window.print()} className="px-8 py-3 bg-blue-600 text-white rounded-xl font-black text-xs">طباعة 🖨️</button>
                 <button onClick={() => setShowCardsForGroup(null)} className="px-8 py-3 bg-slate-200 text-slate-600 rounded-xl font-black text-xs">إغلاق</button>
@@ -113,7 +113,7 @@ const Management: React.FC<ManagementProps> = ({
                       </div>
                       <h3 className="text-lg font-black text-slate-800">{student.name}</h3>
                       <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center mt-6">
-                        <img src={`https://barcodeapi.org/api/128/${student.studentCode}`} className="h-12 w-full object-contain mb-2" alt="Barcode" />
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${student.studentCode}`} className="h-24 w-24 object-contain mb-2" alt="QR Code" />
                         <span className="text-[9px] font-black text-slate-400 tracking-[0.4em]">{student.studentCode}</span>
                       </div>
                     </div>

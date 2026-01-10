@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { Student, QuizResult, PlatformSettings, ParentInquiry } from '../types';
-import MathRenderer from '../components/MathRenderer';
 
 interface ParentPortalProps {
   student: Student | null;

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { PlatformSettings, AppView, CustomSection, Assistant, MathNotation } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { PlatformSettings, AppView, Assistant } from '../types';
 
 interface SettingsProps {
   settings: PlatformSettings;
@@ -9,31 +9,17 @@ interface SettingsProps {
   onUpdateAssistants: (assistants: Assistant[]) => void;
 }
 
-const DEFAULT_LABELS: Record<string, string> = {
-  [AppView.DASHBOARD]: 'الرئيسية',
-  [AppView.STUDENTS]: 'الطلاب',
-  [AppView.ASSIGNMENTS]: 'الواجبات',
-  [AppView.QUIZZES]: 'الاختبارات',
-  [AppView.LIVE_CLASS]: 'البث المباشر',
-  [AppView.FILES]: 'المكتبة',
-  [AppView.MANAGEMENT]: 'المجموعات',
-  [AppView.RESULTS]: 'النتائج',
-  [AppView.CHAT]: 'نادي العباقرة',
-  [AppView.AI_SOLVER]: 'المحلل الذكي',
-  [AppView.NOTIFICATIONS]: 'الإشعارات',
-  [AppView.LEADERBOARD]: 'لوحة الشرف',
-  [AppView.FORMULAS]: 'القوانين',
-  [AppView.CALL_CENTER]: 'خدمة العملاء',
-  [AppView.TEST_CENTER]: 'مختبر الفحص'
-};
-
 const Settings: React.FC<SettingsProps> = ({ settings, assistants, onUpdate, onUpdateAssistants }) => {
-  const [activeCategory, setActiveCategory] = useState<'branding' | 'views' | 'custom' | 'assistants' | 'security' | 'ai'>('branding');
+  const [activeCategory, setActiveCategory] = useState<'branding' | 'content' | 'security' | 'assistants' | 'views'>('branding');
   const [localSettings, setLocalSettings] = useState<PlatformSettings>(settings);
   const [isDirty, setIsDirty] = useState(false);
-  const [newAssistantName, setNewAssistantName] = useState('');
   
-  const [newSection, setNewSection] = useState({ title: '', icon: '📄', content: '', isVisibleToStudents: true });
+  // Assistant State
+  const [newAssistantName, setNewAssistantName] = useState('');
+  const [newAssistantPermissions, setNewAssistantPermissions] = useState<AppView[]>([AppView.DASHBOARD]);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const heroInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -44,65 +30,119 @@ const Settings: React.FC<SettingsProps> = ({ settings, assistants, onUpdate, onU
     setIsDirty(true);
   };
 
+  const handleBrandingChange = (key: keyof PlatformSettings['branding'], value: any) => {
+    setLocalSettings(prev => ({ 
+      ...prev, 
+      branding: { ...prev.branding, [key]: value } 
+    }));
+    setIsDirty(true);
+  };
+
+  const handleContentChange = (key: keyof PlatformSettings['contentTexts'], value: any) => {
+    setLocalSettings(prev => ({ 
+      ...prev, 
+      contentTexts: { ...prev.contentTexts, [key]: value } 
+    }));
+    setIsDirty(true);
+  };
+
+  // View Management Handlers
+  const toggleViewEnabled = (viewId: string) => {
+    const currentEnabled = localSettings.enabledViews || Object.values(AppView);
+    let newEnabled;
+    if (currentEnabled.includes(viewId)) {
+      newEnabled = currentEnabled.filter(v => v !== viewId);
+    } else {
+      newEnabled = [...currentEnabled, viewId];
+    }
+    handleChange('enabledViews', newEnabled);
+  };
+
+  const updateViewLabel = (viewId: string, label: string) => {
+    const currentLabels = localSettings.viewLabels || {};
+    const newLabels = { ...currentLabels, [viewId]: label };
+    handleChange('viewLabels', newLabels);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, key: 'logoUrl' | 'heroImageUrl') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        handleBrandingChange(key, ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = () => {
     onUpdate(localSettings);
     setIsDirty(false);
   };
 
-  const handleToggleView = (view: string) => {
-    const currentEnabled = localSettings.enabledViews || Object.values(AppView);
-    const newEnabled = currentEnabled.includes(view) 
-      ? currentEnabled.filter(v => v !== view)
-      : [...currentEnabled, view];
-    handleChange('enabledViews', newEnabled);
-  };
+  // Assistant Logic
+  const PERMISSION_OPTIONS = [
+    { id: AppView.STUDENTS, label: 'إدارة الطلاب 👥' },
+    { id: AppView.ASSIGNMENTS, label: 'الواجبات 📝' },
+    { id: AppView.QUIZZES, label: 'الاختبارات ⚡' },
+    { id: AppView.FILES, label: 'المحتوى 📚' },
+    { id: AppView.CHAT, label: 'الرد على الرسائل 💬' },
+    { id: AppView.RESULTS, label: 'رصد النتائج 📊' },
+    { id: AppView.REWARDS, label: 'المتجر والنقاط 🎁' },
+    { id: AppView.NOTIFICATIONS, label: 'إرسال التنبيهات 🔔' },
+    { id: AppView.MANAGEMENT, label: 'إدارة المجموعات 🏫' },
+  ];
 
-  const handleLabelChange = (view: string, label: string) => {
-    const newLabels = { ...(localSettings.viewLabels || {}), [view]: label };
-    handleChange('viewLabels', newLabels);
-  };
+  const MANAGED_VIEWS = [
+    { id: AppView.DASHBOARD, defaultLabel: 'الرئيسية', icon: '🏠' },
+    { id: AppView.STUDENTS, defaultLabel: 'الطلاب', icon: '👥' },
+    { id: AppView.FILES, defaultLabel: 'المحتوى', icon: '📚' },
+    { id: AppView.ASSIGNMENTS, defaultLabel: 'الواجبات', icon: '📝' },
+    { id: AppView.QUIZZES, defaultLabel: 'الاختبارات', icon: '⚡' },
+    { id: AppView.LIVE_CLASS, defaultLabel: 'بث مباشر', icon: '🎥' },
+    { id: AppView.CHAT, defaultLabel: 'التفاعل', icon: '💬' },
+    { id: AppView.AI_SOLVER, defaultLabel: 'المحلل الذكي', icon: '🧠' },
+    { id: AppView.REWARDS, defaultLabel: 'المتجر', icon: '🎁' },
+    { id: AppView.RESULTS, defaultLabel: 'النتائج', icon: '📊' },
+  ];
 
-  const handleAddCustomSection = () => {
-    if (!newSection.title.trim()) return;
-    const section: CustomSection = {
-      id: 'cs_' + Date.now(),
-      ...newSection
-    };
-    const updatedSections = [...(localSettings.customSections || []), section];
-    handleChange('customSections', updatedSections);
-    setNewSection({ title: '', icon: '📄', content: '', isVisibleToStudents: true });
-  };
-
-  const handleDeleteCustomSection = (id: string) => {
-    const updatedSections = (localSettings.customSections || []).filter(s => s.id !== id);
-    handleChange('customSections', updatedSections);
-  };
-
-  const handleUpdateCustomSection = (id: string, updates: Partial<CustomSection>) => {
-    const updatedSections = (localSettings.customSections || []).map(s => s.id === id ? { ...s, ...updates } : s);
-    handleChange('customSections', updatedSections);
+  const togglePermission = (view: AppView) => {
+    setNewAssistantPermissions(prev => 
+      prev.includes(view) 
+        ? prev.filter(p => p !== view)
+        : [...prev, view]
+    );
   };
 
   const handleAddAssistant = () => {
     if (!newAssistantName.trim()) return;
+    
+    // Ensure Dashboard is always included
+    const finalPermissions = Array.from(new Set([...newAssistantPermissions, AppView.DASHBOARD]));
+
     const assistant: Assistant = {
       id: 'asst_' + Date.now(),
       name: newAssistantName,
       code: Math.floor(1000 + Math.random() * 9000).toString(),
-      permissions: [AppView.DASHBOARD, AppView.STUDENTS, AppView.ASSIGNMENTS, AppView.CHAT],
+      permissions: finalPermissions,
       addedAt: new Date().toLocaleDateString('ar-EG')
     };
+    
     onUpdateAssistants([...assistants, assistant]);
+    
+    // Reset Form
     setNewAssistantName('');
+    setNewAssistantPermissions([AppView.DASHBOARD]);
+    
+    alert('تم إضافة المساعد بنجاح! \n كود الدخول: ' + assistant.code);
   };
 
   const categories = [
-    { id: 'branding', label: 'الهوية والمظهر', icon: '🎨' },
-    { id: 'views', label: 'الأقسام الأساسية', icon: '🍱' },
-    { id: 'custom', label: 'أقسام مخصصة', icon: '✨' },
-    { id: 'assistants', label: 'المساعدين', icon: '🛠️' },
-    { id: 'security', label: 'الأمان والحماية', icon: '🛡️' },
-    { id: 'ai', label: 'الذكاء الاصطناعي', icon: '🪄' },
+    { id: 'branding', label: 'المظهر والهوية', icon: '🎨' },
+    { id: 'content', label: 'نصوص المحتوى', icon: '📝' },
+    { id: 'security', label: 'الأمان وضبط الأجهزة', icon: '🛡️' },
+    { id: 'assistants', label: 'إدارة الطاقم', icon: '🛠️' },
+    { id: 'views', label: 'الأقسام', icon: '🍱' },
   ];
 
   return (
@@ -138,17 +178,103 @@ const Settings: React.FC<SettingsProps> = ({ settings, assistants, onUpdate, onU
         {activeCategory === 'branding' && (
           <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
              <div className="border-b border-slate-50 pb-6">
-                <h3 className="text-3xl font-black text-slate-800">هوية المعلم والمنصة 🎨</h3>
-                <p className="text-slate-400 font-bold text-sm mt-2">تحكم في المسمى الذي يظهر للطلاب وأولياء الأمور.</p>
+                <h3 className="text-3xl font-black text-slate-800">هوية المنصة البصرية 🎨</h3>
+                <p className="text-slate-400 font-bold text-sm mt-2">خصص الألوان والصور لتناسب هويتك الشخصية.</p>
              </div>
+             
              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 px-6 uppercase tracking-widest">اسم المعلم بالكامل</label>
-                  <input type="text" className="w-full px-8 py-5 bg-slate-50 rounded-2xl font-black border-2 border-transparent focus:border-indigo-600 outline-none shadow-inner" value={localSettings.teacherName} onChange={e => handleChange('teacherName', e.target.value)} />
+                {/* Brand Colors */}
+                <div className="space-y-6">
+                   <h4 className="font-black text-slate-800 text-lg">الألوان الأساسية</h4>
+                   <div className="flex gap-6 items-center bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                      <div className="flex flex-col gap-2 items-center">
+                         <input type="color" className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-lg" value={localSettings.branding.primaryColor} onChange={e => handleBrandingChange('primaryColor', e.target.value)} />
+                         <span className="text-[10px] font-black text-slate-500">اللون الرئيسي</span>
+                      </div>
+                      <div className="flex flex-col gap-2 items-center">
+                         <input type="color" className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-lg" value={localSettings.branding.secondaryColor} onChange={e => handleBrandingChange('secondaryColor', e.target.value)} />
+                         <span className="text-[10px] font-black text-slate-500">اللون الثانوي</span>
+                      </div>
+                   </div>
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 px-6 uppercase tracking-widest">اسم المنصة التعليمية</label>
-                  <input type="text" className="w-full px-8 py-5 bg-slate-50 rounded-2xl font-black border-2 border-transparent focus:border-indigo-600 outline-none shadow-inner" value={localSettings.platformName} onChange={e => handleChange('platformName', e.target.value)} />
+
+                {/* Images */}
+                <div className="space-y-6">
+                   <h4 className="font-black text-slate-800 text-lg">الصور والشعارات</h4>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-slate-50 rounded-3xl text-center border border-slate-100 hover:bg-slate-100 transition-all cursor-pointer group" onClick={() => logoInputRef.current?.click()}>
+                         {localSettings.branding.logoUrl ? (
+                           <img src={localSettings.branding.logoUrl} className="w-20 h-20 mx-auto object-contain rounded-xl" alt="Logo" />
+                         ) : (
+                           <div className="w-20 h-20 bg-white rounded-xl mx-auto flex items-center justify-center text-2xl shadow-sm">🖼️</div>
+                         )}
+                         <p className="text-[9px] font-black text-slate-400 mt-2">شعار المنصة (Logo)</p>
+                         <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
+                      </div>
+
+                      <div className="p-4 bg-slate-50 rounded-3xl text-center border border-slate-100 hover:bg-slate-100 transition-all cursor-pointer group" onClick={() => heroInputRef.current?.click()}>
+                         {localSettings.branding.heroImageUrl ? (
+                           <img src={localSettings.branding.heroImageUrl} className="w-20 h-20 mx-auto object-cover rounded-xl" alt="Hero" />
+                         ) : (
+                           <div className="w-20 h-20 bg-white rounded-xl mx-auto flex items-center justify-center text-2xl shadow-sm">📸</div>
+                         )}
+                         <p className="text-[9px] font-black text-slate-400 mt-2">صورة المعلم (Hero)</p>
+                         <input type="file" ref={heroInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'heroImageUrl')} />
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
+
+        {activeCategory === 'content' && (
+          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
+             <div className="border-b border-slate-50 pb-6">
+                <h3 className="text-3xl font-black text-slate-800">نصوص الواجهة 📝</h3>
+                <p className="text-slate-400 font-bold text-sm mt-2">تحكم في العناوين ورسائل الترحيب التي تظهر للطلاب.</p>
+             </div>
+             
+             <div className="space-y-8">
+                <div className="space-y-4">
+                   <h4 className="font-black text-slate-800 text-sm bg-blue-50 p-2 rounded-lg inline-block px-4">الصفحة الرئيسية (Landing Page)</h4>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">العنوان الرئيسي</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-blue-500 outline-none" value={localSettings.contentTexts.landingTitle} onChange={e => handleContentChange('landingTitle', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">العنوان الفرعي</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-blue-500 outline-none" value={localSettings.contentTexts.landingSubtitle} onChange={e => handleContentChange('landingSubtitle', e.target.value)} />
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-4">
+                   <h4 className="font-black text-slate-800 text-sm bg-amber-50 p-2 rounded-lg inline-block px-4">بوابة الطالب (Student Portal)</h4>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">عنوان الترحيب</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-amber-500 outline-none" value={localSettings.contentTexts.studentWelcomeTitle} onChange={e => handleContentChange('studentWelcomeTitle', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">الرسالة الفرعية</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-amber-500 outline-none" value={localSettings.contentTexts.studentWelcomeSubtitle} onChange={e => handleContentChange('studentWelcomeSubtitle', e.target.value)} />
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-4">
+                   <h4 className="font-black text-slate-800 text-sm bg-emerald-50 p-2 rounded-lg inline-block px-4">عام</h4>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">اسم المعلم (كما يظهر)</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-emerald-500 outline-none" value={localSettings.teacherName} onChange={e => handleChange('teacherName', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400">اسم المنصة</label>
+                         <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-emerald-500 outline-none" value={localSettings.platformName} onChange={e => handleChange('platformName', e.target.value)} />
+                      </div>
+                   </div>
                 </div>
              </div>
           </div>
@@ -157,184 +283,107 @@ const Settings: React.FC<SettingsProps> = ({ settings, assistants, onUpdate, onU
         {activeCategory === 'security' && (
           <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
              <div className="border-b border-slate-50 pb-6">
-                <h3 className="text-3xl font-black text-slate-800">الأمان وحماية المحتوى 🛡️</h3>
-                <p className="text-slate-400 font-bold text-sm mt-2">تأمين المنصة ضد السرقة ومنع تداول الحسابات.</p>
+                <h3 className="text-3xl font-black text-slate-800">الأمان وضبط الأجهزة 🛡️</h3>
+                <p className="text-slate-400 font-bold text-sm mt-2">تحكم في من يدخل وكيفية حماية المحتوى من السرقة.</p>
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-8 bg-slate-50 rounded-[3rem] flex justify-between items-center group hover:bg-white border-2 border-transparent hover:border-indigo-600 transition-all">
+             {/* Admin Code */}
+             <div className="bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col md:flex-row justify-between items-center gap-6">
+                <div className="flex items-center gap-4">
+                   <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">🔑</div>
                    <div>
-                      <h4 className="font-black text-slate-800">حماية الصفحة 🔒</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">منع النقر الأيمن، النسخ، وفتح أدوات المطور.</p>
-                   </div>
-                   <button onClick={() => handleChange('protectionEnabled', !localSettings.protectionEnabled)} className={`w-14 h-8 rounded-full transition-all relative ${localSettings.protectionEnabled ? 'bg-emerald-500 shadow-lg shadow-emerald-200' : 'bg-slate-300'}`}>
-                      <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all ${localSettings.protectionEnabled ? 'right-7' : 'right-1.5'}`}></div>
-                   </button>
-                </div>
-
-                <div className="p-8 bg-slate-50 rounded-[3rem] flex justify-between items-center group hover:bg-white border-2 border-transparent hover:border-indigo-600 transition-all">
-                   <div>
-                      <h4 className="font-black text-slate-800">العلامة المائية الذكية 🎥</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">ظهور بيانات الطالب بشكل عشوائي فوق الفيديو.</p>
-                   </div>
-                   <button onClick={() => handleChange('watermarkEnabled', !localSettings.watermarkEnabled)} className={`w-14 h-8 rounded-full transition-all relative ${localSettings.watermarkEnabled ? 'bg-emerald-500 shadow-lg shadow-emerald-200' : 'bg-slate-300'}`}>
-                      <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all ${localSettings.watermarkEnabled ? 'right-7' : 'right-1.5'}`}></div>
-                   </button>
-                </div>
-
-                <div className="space-y-3">
-                   <label className="text-[10px] font-black text-slate-400 px-6 uppercase">نص العلامة المائية</label>
-                   <input type="text" className="w-full px-8 py-5 bg-slate-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-indigo-600" value={localSettings.watermarkText} onChange={e => handleChange('watermarkText', e.target.value)} />
-                </div>
-
-                <div className="space-y-3">
-                   <label className="text-[10px] font-black text-slate-400 px-6 uppercase">حد الأجهزة لكل طالب</label>
-                   <input type="number" min="1" max="5" className="w-full px-8 py-5 bg-slate-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-indigo-600" value={localSettings.maxDevicesPerStudent} onChange={e => handleChange('maxDevicesPerStudent', parseInt(e.target.value))} />
-                   <p className="text-[9px] text-rose-500 font-bold px-4">* سيتم قفل الحساب إذا حاول الطالب الدخول من جهاز إضافي.</p>
-                </div>
-             </div>
-          </div>
-        )}
-
-        {activeCategory === 'ai' && (
-          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
-             <div className="border-b border-slate-50 pb-6">
-                <h3 className="text-3xl font-black text-slate-800">الذكاء الاصطناعي (Gemini Pro) 🪄</h3>
-                <p className="text-slate-400 font-bold text-sm mt-2">تخصيص تجربة التعلم الذكي لطلابك.</p>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                   <label className="text-[10px] font-black text-slate-400 px-6 uppercase">نمط الرموز الرياضية</label>
-                   <div className="flex bg-slate-50 p-2 rounded-3xl border-2 border-slate-100">
-                      <button onClick={() => handleChange('mathNotation', 'arabic')} className={`flex-1 py-4 rounded-2xl font-black text-xs transition-all ${localSettings.mathNotation === 'arabic' ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400'}`}>عربي (س، ص، ع)</button>
-                      <button onClick={() => handleChange('mathNotation', 'english')} className={`flex-1 py-4 rounded-2xl font-black text-xs transition-all ${localSettings.mathNotation === 'english' ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400'}`}>English (x, y, z)</button>
+                      <h4 className="font-black text-lg">كود دخول المعلم السري</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">المفتاح الرئيسي للوحة التحكم</p>
                    </div>
                 </div>
-
-                <div className="p-8 bg-indigo-950 rounded-[3rem] text-white flex justify-between items-center shadow-2xl">
-                   <div>
-                      <h4 className="font-black">وضع الامتحانات 📝</h4>
-                      <p className="text-[10px] text-indigo-300 font-bold">تعطيل المحلل الذكي والشات أثناء فترة الاختبارات.</p>
-                   </div>
-                   <button onClick={() => handleChange('examMode', !localSettings.examMode)} className={`w-14 h-8 rounded-full transition-all relative ${localSettings.examMode ? 'bg-rose-500' : 'bg-indigo-800'}`}>
-                      <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all ${localSettings.examMode ? 'right-7' : 'right-1.5'}`}></div>
-                   </button>
-                </div>
-
-                <div className="p-8 bg-slate-50 rounded-[3rem] flex justify-between items-center border-2 border-transparent hover:border-blue-600 transition-all group">
-                   <div>
-                      <h4 className="font-black text-slate-800">تفعيل المحلل الذكي (Solver)</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">السماح للطلاب بسؤال المعلم الآلي حول المسائل.</p>
-                   </div>
-                   <button onClick={() => handleChange('enableAiSolver', !localSettings.enableAiSolver)} className={`w-14 h-8 rounded-full transition-all relative ${localSettings.enableAiSolver ? 'bg-blue-600 shadow-lg' : 'bg-slate-300'}`}>
-                      <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all ${localSettings.enableAiSolver ? 'right-7' : 'right-1.5'}`}></div>
-                   </button>
-                </div>
-                
-                <div className="p-8 bg-slate-50 rounded-[3rem] flex justify-between items-center border-2 border-transparent hover:border-blue-600 transition-all group">
-                   <div>
-                      <h4 className="font-black text-slate-800">الترتيب التلقائي (Leaderboard)</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">تحديث لوحة الشرف آلياً بناءً على النقاط.</p>
-                   </div>
-                   <button onClick={() => handleChange('enableLeaderboard', !localSettings.enableLeaderboard)} className={`w-14 h-8 rounded-full transition-all relative ${localSettings.enableLeaderboard ? 'bg-blue-600 shadow-lg' : 'bg-slate-300'}`}>
-                      <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all ${localSettings.enableLeaderboard ? 'right-7' : 'right-1.5'}`}></div>
-                   </button>
-                </div>
-             </div>
-          </div>
-        )}
-
-        {activeCategory === 'custom' && (
-          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
-             <div className="border-b border-slate-50 pb-6">
-                <h3 className="text-3xl font-black text-slate-800">إضافة وإدارة أقسام مخصصة ✨</h3>
-                <p className="text-slate-400 font-bold text-sm mt-2">يمكنك إنشاء صفحات جديدة تظهر في القائمة الجانبية (مثل: مذكرات المراجعة، قوانين هامة).</p>
-             </div>
-
-             <div className="bg-indigo-50 p-10 rounded-[3rem] space-y-8">
-                <h4 className="font-black text-indigo-900">＋ قسم جديد</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   <input type="text" placeholder="اسم القسم (مثلاً: قوانين المثلثات)" className="md:col-span-2 px-8 py-5 bg-white rounded-2xl font-black outline-none shadow-sm" value={newSection.title} onChange={e => setNewSection({...newSection, title: e.target.value})} />
-                   <input type="text" placeholder="أيقونة (Emoji)" className="px-8 py-5 bg-white rounded-2xl font-black text-center text-2xl outline-none shadow-sm" value={newSection.icon} onChange={e => setNewSection({...newSection, icon: e.target.value})} />
-                </div>
-                <textarea 
-                  placeholder="محتوى القسم (يدعم الرموز الرياضية $...$)" 
-                  className="w-full p-8 bg-white rounded-3xl font-bold text-sm h-40 outline-none shadow-sm resize-none"
-                  value={newSection.content}
-                  onChange={e => setNewSection({...newSection, content: e.target.value})}
+                <input 
+                  type="text" 
+                  className="w-full md:w-64 px-8 py-4 bg-white/5 border border-white/10 rounded-2xl font-black text-2xl text-center tracking-[0.5em] outline-none focus:border-blue-500 transition-all" 
+                  value={localSettings.adminCode} 
+                  onChange={e => handleChange('adminCode', e.target.value)} 
                 />
-                <div className="flex items-center justify-between">
-                   <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={newSection.isVisibleToStudents} onChange={e => setNewSection({...newSection, isVisibleToStudents: e.target.checked})} className="w-6 h-6 rounded-lg" />
-                      <span className="font-black text-indigo-900 text-xs">ظهور للطلاب فوراً</span>
-                   </label>
-                   <button onClick={handleAddCustomSection} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:scale-105 transition-all">إضافة القسم للقائمة 🚀</button>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Device Limiter */}
+                <div className="bg-slate-50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
+                   <div className="flex items-center gap-4 mb-2">
+                      <span className="text-3xl">📱</span>
+                      <div>
+                         <h4 className="font-black text-slate-800">عدد الأجهزة المسموح بها</h4>
+                         <p className="text-[10px] text-slate-400 font-bold">لكل طالب (يمنع الدخول من جهاز ثالث)</p>
+                      </div>
+                   </div>
+                   
+                   <div className="flex items-center justify-between bg-white p-4 rounded-3xl shadow-sm">
+                      <button 
+                        onClick={() => handleChange('maxDevicesPerStudent', Math.max(1, (localSettings.maxDevicesPerStudent || 2) - 1))}
+                        className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition-all"
+                      >-</button>
+                      <span className="text-4xl font-black text-blue-600">{localSettings.maxDevicesPerStudent || 2}</span>
+                      <button 
+                        onClick={() => handleChange('maxDevicesPerStudent', (localSettings.maxDevicesPerStudent || 2) + 1)}
+                        className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-500 hover:bg-emerald-100 hover:text-emerald-600 transition-all"
+                      >+</button>
+                   </div>
+                </div>
+
+                {/* Anti-Theft Controls */}
+                <div className="bg-rose-50 p-8 rounded-[3rem] border border-rose-100 space-y-6">
+                   <div className="flex items-center gap-4 mb-2">
+                      <span className="text-3xl">🚫</span>
+                      <div>
+                         <h4 className="font-black text-slate-800">حماية المحتوى من النسخ</h4>
+                         <p className="text-[10px] text-rose-400 font-bold">منع تصوير الشاشة وتسريب الفيديوهات</p>
+                      </div>
+                   </div>
+
+                   {/* Watermark Toggle */}
+                   <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm cursor-pointer" onClick={() => handleChange('watermarkEnabled', !localSettings.watermarkEnabled)}>
+                         <span className="text-xs font-black text-slate-600">العلامة المائية المتحركة</span>
+                         <div className={`w-12 h-7 rounded-full relative transition-all ${localSettings.watermarkEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${localSettings.watermarkEnabled ? 'left-1' : 'left-6'}`}></div>
+                         </div>
+                      </div>
+                      
+                      {localSettings.watermarkEnabled && (
+                        <input 
+                          type="text" 
+                          placeholder="نص العلامة المائية (مثلاً: منصة المحترف)"
+                          className="w-full px-6 py-3 bg-white rounded-2xl font-bold text-xs outline-none border focus:border-rose-300"
+                          value={localSettings.watermarkText}
+                          onChange={e => handleChange('watermarkText', e.target.value)}
+                        />
+                      )}
+
+                      {/* Integrity Toggle */}
+                      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm cursor-pointer" onClick={() => handleChange('integrityMode', !localSettings.integrityMode)}>
+                         <div>
+                            <p className="text-xs font-black text-slate-600">وضع النزاهة (Integrity Mode)</p>
+                            <p className="text-[8px] text-slate-400 font-bold">طمس الشاشة عند محاولة التسجيل أو تبديل النافذة</p>
+                         </div>
+                         <div className={`w-12 h-7 rounded-full relative transition-all ${localSettings.integrityMode ? 'bg-rose-500' : 'bg-slate-300'}`}>
+                            <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${localSettings.integrityMode ? 'left-1' : 'left-6'}`}></div>
+                         </div>
+                      </div>
+                   </div>
                 </div>
              </div>
 
-             <div className="space-y-6">
-                <h4 className="font-black text-slate-400 text-xs uppercase tracking-widest px-4">الأقسام المضافة حالياً:</h4>
-                {(localSettings.customSections || []).map(section => (
-                  <div key={section.id} className="p-8 bg-slate-50 border-2 border-slate-100 rounded-[3rem] space-y-6 group hover:border-indigo-100 transition-all">
-                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                           <span className="text-4xl">{section.icon}</span>
-                           <div>
-                              <input type="text" className="bg-transparent font-black text-lg outline-none border-b border-transparent focus:border-indigo-200" value={section.title} onChange={e => handleUpdateCustomSection(section.id, {title: e.target.value})} />
-                              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">ID: {section.id}</p>
-                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                           <button onClick={() => handleUpdateCustomSection(section.id, {isVisibleToStudents: !section.isVisibleToStudents})} className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all ${section.isVisibleToStudents ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
-                              {section.isVisibleToStudents ? 'مرئي للطالب ✓' : 'مخفي عن الطالب'}
-                           </button>
-                           <button onClick={() => handleDeleteCustomSection(section.id)} className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">🗑️</button>
-                        </div>
-                     </div>
-                     <textarea 
-                        className="w-full p-6 bg-white border border-slate-200 rounded-2xl font-bold text-xs h-24 outline-none resize-none" 
-                        value={section.content} 
-                        onChange={e => handleUpdateCustomSection(section.id, {content: e.target.value})}
-                     />
-                  </div>
-                ))}
-             </div>
-          </div>
-        )}
-
-        {activeCategory === 'views' && (
-          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
-             <div className="border-b border-slate-50 pb-6">
-                <h3 className="text-3xl font-black text-slate-800">إدارة الأقسام الأساسية 🍱</h3>
-                <p className="text-slate-400 font-bold text-sm mt-2">اختر الأقسام التي تريد ظهورها في القائمة الجانبية وخصص أسماءها.</p>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.values(AppView).filter(v => v !== AppView.SETTINGS && v !== AppView.REGISTRATION && v !== AppView.STUDENT_PORTAL).map(view => {
-                  const isEnabled = (localSettings.enabledViews || Object.values(AppView)).includes(view);
-                  return (
-                    <div key={view} className={`p-6 rounded-[2.5rem] border-2 transition-all ${isEnabled ? 'bg-white border-indigo-100 shadow-lg' : 'bg-slate-50 border-transparent opacity-60'}`}>
-                       <div className="flex justify-between items-center mb-4">
-                          <span className="text-2xl">{DEFAULT_LABELS[view]?.split(' ')[0] || '📁'}</span>
-                          <button 
-                            onClick={() => handleToggleView(view)}
-                            className={`w-14 h-7 rounded-full transition-all relative ${isEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
-                          >
-                             <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${isEnabled ? 'right-8' : 'right-1'}`}></div>
-                          </button>
-                       </div>
-                       <div className="space-y-2">
-                          <label className="text-[8px] font-black text-slate-400 px-2 uppercase">المسمى المخصص</label>
-                          <input 
-                            type="text" 
-                            className="w-full px-4 py-3 bg-slate-100 rounded-xl font-black text-xs outline-none focus:bg-white border border-transparent focus:border-indigo-100" 
-                            value={localSettings.viewLabels?.[view] || DEFAULT_LABELS[view] || view} 
-                            onChange={e => handleLabelChange(view, e.target.value)}
-                          />
-                       </div>
-                    </div>
-                  );
-                })}
+             <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex items-center gap-4">
+                <span className="text-2xl">⚡</span>
+                <p className="text-[10px] font-bold text-amber-800 leading-relaxed">
+                  تفعيل <b>حماية الصفحة</b> سيقوم أيضاً بتعطيل النقر بزر الماوس الأيمن (Right Click) ومنع أدوات المطور (DevTools) تلقائياً لزيادة الأمان.
+                </p>
+                <div className="flex-1 text-left">
+                   <button 
+                     onClick={() => handleChange('protectionEnabled', !localSettings.protectionEnabled)} 
+                     className={`px-6 py-2 rounded-xl text-[10px] font-black transition-all ${localSettings.protectionEnabled ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-200 text-slate-500'}`}
+                   >
+                     {localSettings.protectionEnabled ? 'الحماية مفعلة' : 'الحماية معطلة'}
+                   </button>
+                </div>
              </div>
           </div>
         )}
@@ -343,31 +392,114 @@ const Settings: React.FC<SettingsProps> = ({ settings, assistants, onUpdate, onU
            <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
               <div className="border-b border-slate-50 pb-6">
                   <h3 className="text-3xl font-black text-slate-800">إدارة المساعدين 🛠️</h3>
+                  <p className="text-sm text-slate-400 font-bold mt-2">إضافة مساعدين وتحديد صلاحياتهم بدقة.</p>
               </div>
-              <div className="bg-indigo-50 p-8 rounded-[3rem] space-y-6">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <input type="text" placeholder="اسم المساعد الجديد" className="flex-1 px-8 py-5 bg-white rounded-2xl font-black outline-none shadow-sm" value={newAssistantName} onChange={e => setNewAssistantName(e.target.value)} />
-                    <button onClick={handleAddAssistant} className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">إضافة ＋</button>
+              
+              {/* Add Assistant Form */}
+              <div className="bg-indigo-50/50 border-2 border-indigo-100 p-8 rounded-[3rem] space-y-6">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-indigo-400 uppercase px-2">بيانات المساعد الجديد</label>
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <input type="text" placeholder="اسم المساعد" className="flex-1 px-8 py-5 bg-white rounded-2xl font-black outline-none shadow-sm focus:ring-2 focus:ring-indigo-500 transition-all" value={newAssistantName} onChange={e => setNewAssistantName(e.target.value)} />
+                      <button onClick={handleAddAssistant} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:scale-105 transition-all">حفظ وإضافة ＋</button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-indigo-100">
+                     <label className="text-[10px] font-black text-indigo-400 uppercase px-2">تحديد الصلاحيات</label>
+                     <div className="flex flex-wrap gap-3">
+                        {PERMISSION_OPTIONS.map(opt => (
+                          <button 
+                            key={opt.id}
+                            onClick={() => togglePermission(opt.id as AppView)}
+                            className={`px-4 py-2.5 rounded-xl text-[10px] font-black border transition-all flex items-center gap-2 ${
+                              newAssistantPermissions.includes(opt.id as AppView)
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                            }`}
+                          >
+                            <span>{newAssistantPermissions.includes(opt.id as AppView) ? '✓' : '+'}</span>
+                            {opt.label}
+                          </button>
+                        ))}
+                     </div>
                   </div>
               </div>
+
+              {/* List of Assistants */}
               <div className="grid grid-cols-1 gap-6">
                 {assistants.map(asst => (
-                  <div key={asst.id} className="p-8 bg-white border-2 border-slate-50 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl font-black">🛠️</div>
+                  <div key={asst.id} className="p-8 bg-white border border-slate-100 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm hover:shadow-md transition-all">
+                      <div className="flex items-center gap-6 w-full md:w-auto">
+                        <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-2xl">🛠️</div>
                         <div>
                           <h4 className="font-black text-slate-800 text-lg">{asst.name}</h4>
-                          <span className="text-[10px] font-bold text-slate-400">تاريخ الإضافة: {asst.addedAt}</span>
+                          <span className="inline-block bg-slate-100 px-3 py-1 rounded-lg text-[10px] font-black text-slate-500 mt-1">Code: {asst.code}</span>
                         </div>
                       </div>
-                      <div className="flex gap-4 items-center">
-                         <div className="bg-indigo-600 px-6 py-3 rounded-xl text-white font-black text-xl tracking-widest">{asst.code}</div>
-                         <button onClick={() => onUpdateAssistants(assistants.filter(a => a.id !== asst.id))} className="text-rose-500 font-black text-xs">🗑️ حذف</button>
+                      
+                      <div className="flex flex-1 flex-wrap gap-2 justify-center md:justify-start px-4">
+                         {asst.permissions.filter(p => p !== AppView.DASHBOARD).map(p => (
+                           <span key={p} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-bold border border-indigo-100">
+                             {PERMISSION_OPTIONS.find(opt => opt.id === p)?.label.split(' ')[0] || p}
+                           </span>
+                         ))}
                       </div>
+
+                      <button onClick={() => onUpdateAssistants(assistants.filter(a => a.id !== asst.id))} className="w-12 h-12 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">
+                        🗑️
+                      </button>
                   </div>
                 ))}
+                {assistants.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 font-bold opacity-50">لا يوجد مساعدين مضافين حالياً</div>
+                )}
               </div>
            </div>
+        )}
+
+        {activeCategory === 'views' && (
+          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-10 animate-fadeIn">
+             <div className="border-b border-slate-50 pb-6">
+                <h3 className="text-3xl font-black text-slate-800">إدارة الأقسام والقوائم 🍱</h3>
+                <p className="text-slate-400 font-bold text-sm mt-2">يمكنك تغيير أسماء الأقسام أو إخفاء ما لا تحتاجه.</p>
+             </div>
+
+             <div className="grid grid-cols-1 gap-6">
+                {MANAGED_VIEWS.map((view) => {
+                  const isEnabled = (localSettings.enabledViews || Object.values(AppView)).includes(view.id as any);
+                  const currentLabel = localSettings.viewLabels?.[view.id] || view.defaultLabel;
+
+                  return (
+                    <div key={view.id} className={`p-6 rounded-[2.5rem] border-2 transition-all flex flex-col md:flex-row justify-between items-center gap-6 ${isEnabled ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                       <div className="flex items-center gap-4 w-full md:w-auto">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all ${isEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}>
+                             {view.icon}
+                          </div>
+                          <div className="flex-1">
+                             <input 
+                               type="text" 
+                               className={`font-black text-lg bg-transparent outline-none w-full ${isEnabled ? 'text-slate-800' : 'text-slate-400'}`}
+                               value={currentLabel}
+                               onChange={(e) => updateViewLabel(view.id, e.target.value)}
+                               disabled={!isEnabled}
+                             />
+                             <p className="text-[10px] text-slate-400 font-bold">الاسم الأصلي: {view.defaultLabel}</p>
+                          </div>
+                       </div>
+
+                       <button 
+                         onClick={() => toggleViewEnabled(view.id)}
+                         className={`px-6 py-3 rounded-xl font-black text-xs transition-all flex items-center gap-2 ${isEnabled ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
+                       >
+                         <div className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                         {isEnabled ? 'مفعل (ظاهر للطلاب)' : 'معطل (مخفي)'}
+                       </button>
+                    </div>
+                  );
+                })}
+             </div>
+          </div>
         )}
       </div>
     </div>

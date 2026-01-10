@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Student, Year, Group, Quiz, Assignment, AppView, PlatformSettings } from '../types';
+import { Student, Year, Group, Quiz, Assignment, PlatformSettings } from '../types';
 import { generateQuizFromContent } from '../services/geminiService';
 import InteractiveBoard from '../components/InteractiveBoard';
 
@@ -18,7 +18,6 @@ interface TestCenterProps {
 
 const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizzes, assignments, settings, onMockData, onEnterSimulation, addToast }) => {
   const [isAITesting, setIsAITesting] = useState(false);
-  const [aiTestResult, setAiTestResult] = useState<any>(null);
   const [showBoardTest, setShowBoardTest] = useState(false);
 
   const generateMockData = () => {

@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Year, Group, Student } from '../types';
 
 interface RegistrationProps {
@@ -23,7 +23,7 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
     parentPhone: '',
     yearId: '',
     groupId: '',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky',
     registrationDate: new Date().toISOString().split('T')[0]
   });
 
@@ -74,7 +74,7 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
   };
 
   const handleSubmit = () => {
-    if (Object.values(formData).some(v => !v)) return alert('يرجى إكمال كافة البيانات لضمان نجاح التسجيل ⚠️');
+    if (!formData.name || !formData.studentPhone || !formData.parentPhone) return alert('يرجى إكمال كافة البيانات الأساسية ⚠️');
     onRegister({
       name: formData.name,
       studentPhone: formData.studentPhone,
@@ -89,178 +89,230 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
     });
   };
 
-  const steps = [
-    { n: 1, label: 'المرحلة', icon: '🎓' },
-    { n: 2, label: 'المجموعة', icon: '🏫' },
-    { n: 3, label: 'البيانات والصورة', icon: '👤' }
-  ];
+  const getStepTitle = () => {
+    switch(step) {
+      case 1: return "اختر مرحلتك الدراسية";
+      case 2: return "اختر المجموعة المناسبة";
+      case 3: return "بياناتك الشخصية";
+      default: return "";
+    }
+  };
+
+  const getStepDesc = () => {
+    switch(step) {
+      case 1: return "حدد الصف الدراسي للبدء في عرض المجموعات المتاحة لك.";
+      case 2: return "اختر الموعد الأنسب لجدولك سواء حضور في السنتر أو أونلاين.";
+      case 3: return "قم برفع صورة شخصية واضحة (سيلفي) لإصدار كارنيه الطالب.";
+      default: return "";
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center p-4 md:p-10 font-['Cairo'] relative overflow-hidden" dir="rtl">
-       <div className="absolute inset-0 pointer-events-none opacity-20">
-          <div className="absolute top-20 right-[10%] text-[20rem] font-black text-blue-500/10 rotate-12">∑</div>
-          <div className="absolute bottom-20 left-[10%] text-[18rem] font-black text-indigo-500/10 -rotate-12">∫</div>
-       </div>
+    <div className="min-h-screen bg-[#0f172a] font-['Cairo'] flex overflow-hidden relative text-right" dir="rtl">
+      
+      {/* Background Ambience */}
+      <div className="absolute inset-0 pointer-events-none">
+         <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 blur-[150px] rounded-full"></div>
+         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[150px] rounded-full"></div>
+         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
+      </div>
 
-       <div className="w-full max-w-5xl flex justify-between items-center mb-10 relative z-20">
-          <div className="flex items-center gap-4">
-             <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-2xl">∑</div>
-             <div className="text-right">
-                <h1 className="text-white font-black text-xl leading-tight">تسجيل طالب جديد</h1>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">MathMaster Pro Academy</p>
-             </div>
-          </div>
-          <button onClick={onBack} className="group flex items-center gap-3 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition-all">
-             <span className="text-xs font-black">العودة للرئيسية</span>
-             <span className="text-xl transition-transform group-hover:translate-x-[-5px]">⭢</span>
-          </button>
-       </div>
+      <div className="container mx-auto max-w-7xl flex flex-col lg:flex-row h-full relative z-10">
+        
+        {/* Left Panel (Info & Steps) */}
+        <div className="lg:w-1/3 p-8 lg:p-12 flex flex-col justify-between relative">
+           <div>
+              <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-8 text-xs font-bold">
+                 <span>←</span> <span>العودة للرئيسية</span>
+              </button>
+              
+              <div className="mb-10">
+                 <h1 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+                    انضم لنخبة <br/>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">الرياضيات</span>
+                 </h1>
+                 <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+                    سجل بياناتك الآن للحصول على عضوية أكاديمية الأستاذ {teacherName} والتمتع بكافة المميزات.
+                 </p>
+              </div>
 
-       <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
-          <div className="lg:col-span-3 hidden lg:flex flex-col gap-6">
-             {steps.map((s) => {
-               const isActive = step === s.n;
-               const isDone = step > s.n;
-               return (
-                 <div key={s.n} className={`p-6 rounded-[2.5rem] border-2 transition-all duration-500 flex flex-col gap-3 ${
-                   isActive ? 'bg-blue-600 border-blue-500 shadow-2xl shadow-blue-900/40 scale-105' : 
-                   isDone ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 
-                   'bg-white/5 border-white/5 text-slate-600'
-                 }`}>
-                    <div className="flex justify-between items-center">
-                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${
-                         isActive ? 'bg-white text-blue-600' : isDone ? 'bg-emerald-500 text-white' : 'bg-white/10 text-slate-500'
-                       }`}>
-                          {isDone ? '✓' : s.n}
-                       </span>
-                       <span className="text-2xl">{s.icon}</span>
-                    </div>
-                    <div>
-                       <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-blue-200' : 'text-slate-500'}`}>الخطوة {s.n}</p>
-                       <p className={`text-sm font-black ${isActive ? 'text-white' : 'text-slate-400'}`}>{s.label}</p>
-                    </div>
-                 </div>
-               );
-             })}
-          </div>
+              {/* Desktop Stepper */}
+              <div className="hidden lg:flex flex-col gap-8">
+                 {[1, 2, 3].map((s) => (
+                   <div key={s} className={`flex items-center gap-4 transition-all duration-500 ${step === s ? 'opacity-100 translate-x-0' : step > s ? 'opacity-50' : 'opacity-30'}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black border-2 transition-all ${step === s ? 'bg-blue-600 border-blue-600 text-white scale-110 shadow-[0_0_20px_rgba(37,99,235,0.5)]' : step > s ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-white/20 text-white'}`}>
+                         {step > s ? '✓' : s}
+                      </div>
+                      <div>
+                         <p className="text-white font-bold text-sm">{s === 1 ? 'المرحلة' : s === 2 ? 'المجموعة' : 'الهوية'}</p>
+                         {step === s && <p className="text-blue-400 text-[10px] animate-fadeIn">الخطوة الحالية</p>}
+                      </div>
+                   </div>
+                 ))}
+              </div>
+           </div>
 
-          <div className="lg:col-span-9 bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col min-h-[600px]">
-             <div className="h-2 w-full bg-slate-100 flex overflow-hidden">
-                <div 
-                  className="h-full bg-blue-600 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(37,99,235,0.8)]" 
-                  style={{ width: `${(step / 3) * 100}%` }}
-                ></div>
-             </div>
+           <div className="hidden lg:block text-slate-500 text-[10px] font-black uppercase tracking-widest">
+              MathMaster Pro &copy; {new Date().getFullYear()}
+           </div>
+        </div>
 
-             <div className="flex-1 p-8 md:p-12 flex flex-col">
-                <div className="mb-10">
-                   <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter">
-                      {step === 1 ? 'اختر صفك الدراسي' : step === 2 ? 'اختر مجموعتك المفضلة' : 'البيانات الشخصية والصورة'}
-                   </h2>
+        {/* Right Panel (Form) */}
+        <div className="lg:w-2/3 bg-white/5 backdrop-blur-2xl border-r border-white/10 h-full overflow-y-auto no-scrollbar relative flex flex-col">
+           <div className="p-8 lg:p-12 flex-1 flex flex-col justify-center max-w-3xl mx-auto w-full">
+              
+              <div className="mb-8">
+                 <h2 className="text-3xl font-black text-white mb-2">{getStepTitle()}</h2>
+                 <p className="text-slate-400 text-sm font-medium">{getStepDesc()}</p>
+              </div>
+
+              {/* Step 1: Years */}
+              {step === 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-slideUp">
+                   {years.map(y => (
+                     <button 
+                       key={y.id}
+                       onClick={() => { setFormData({...formData, yearId: y.id}); setStep(2); }}
+                       className="group relative p-6 bg-slate-800/50 hover:bg-blue-600 transition-all rounded-[2rem] border border-white/5 text-right overflow-hidden"
+                     >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-full transition-all group-hover:bg-white/20"></div>
+                        <span className="text-4xl block mb-4 group-hover:scale-110 transition-transform origin-bottom-right">🎓</span>
+                        <h3 className="text-xl font-black text-white">{y.name}</h3>
+                        <p className="text-slate-400 text-xs mt-2 group-hover:text-blue-100">اضغط للاختيار ⭠</p>
+                     </button>
+                   ))}
                 </div>
+              )}
 
-                <div className="flex-1">
-                   {step === 1 && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-                        {years.map((y, idx) => (
-                          <button 
-                            key={y.id} 
-                            onClick={() => { setFormData({...formData, yearId: y.id}); setStep(2); }}
-                            className="group p-8 rounded-[2.5rem] border-4 border-slate-50 bg-slate-50/50 hover:bg-white hover:border-blue-600 hover:shadow-2xl transition-all duration-500 text-right relative overflow-hidden"
-                          >
-                             <div className="relative z-10 flex flex-col gap-4">
-                                <span className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all">🎓</span>
-                                <span className="font-black text-slate-800 text-xl">{y.name}</span>
-                             </div>
-                          </button>
-                        ))}
-                     </div>
-                   )}
-
-                   {step === 2 && (
-                     <div className="space-y-8 animate-fadeIn">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           {groups.filter(g => g.yearId === formData.yearId).length > 0 ? (
-                             groups.filter(g => g.yearId === formData.yearId).map((g) => (
-                               <button 
-                                 key={g.id} 
-                                 onClick={() => { setFormData({...formData, groupId: g.id}); setStep(3); }}
-                                 className="group p-8 rounded-[3rem] border-4 border-slate-50 bg-slate-50/50 hover:bg-white hover:border-indigo-600 hover:shadow-2xl transition-all duration-500 text-right flex flex-col gap-4"
-                               >
-                                  <div className="flex justify-between items-start w-full">
-                                     <span className="font-black text-slate-900 text-xl">{g.name}</span>
-                                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase ${g.type === 'center' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                        {g.type === 'center' ? 'سنتر' : 'أونلاين'}
-                                     </span>
-                                  </div>
-                                  <div className="text-slate-400 font-bold text-sm">📅 {g.time}</div>
-                               </button>
-                             ))
-                           ) : (
-                              <div className="col-span-full py-20 text-center opacity-60">لا توجد مجموعات حالياً</div>
-                           )}
-                        </div>
-                        <button onClick={() => setStep(1)} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-black transition-all shadow-xl">⭢ العودة</button>
-                     </div>
-                   )}
-
-                   {step === 3 && (
-                     <div className="space-y-8 animate-fadeIn">
-                        {/* Avatar Picker Section */}
-                        <div className="flex flex-col md:flex-row items-center gap-10 bg-slate-50 p-8 rounded-[3rem] border-2 border-dashed border-slate-200">
-                           <div className="relative group">
-                              <div className="w-40 h-40 rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl bg-slate-200 relative">
-                                 {isCameraActive ? (
-                                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                                 ) : (
-                                    <img src={formData.avatar} className="w-full h-full object-cover" alt="Profile" />
-                                 )}
+              {/* Step 2: Groups */}
+              {step === 2 && (
+                <div className="space-y-4 animate-slideUp">
+                   <div className="grid grid-cols-1 gap-4">
+                      {groups.filter(g => g.yearId === formData.yearId).map(g => (
+                        <button 
+                          key={g.id}
+                          onClick={() => { setFormData({...formData, groupId: g.id}); setStep(3); }}
+                          className="flex items-center justify-between p-6 bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-blue-500/50 rounded-[2rem] transition-all group text-right"
+                        >
+                           <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${g.type === 'center' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                 {g.type === 'center' ? '🏫' : '🌐'}
                               </div>
-                              <canvas ref={canvasRef} className="hidden" />
-                              {isCameraActive && (
-                                 <button onClick={capturePhoto} className="absolute inset-0 bg-blue-600/60 backdrop-blur-sm text-white font-black text-xs flex items-center justify-center">اضغط للالتقاط 📸</button>
-                              )}
-                           </div>
-                           
-                           <div className="flex-1 space-y-4 text-center md:text-right">
-                              <h4 className="font-black text-slate-800 text-lg">الصورة الشخصية</h4>
-                              <p className="text-slate-400 font-bold text-xs">ستظهر هذه الصورة في الكارنيه الخاص بك.</p>
-                              <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                                 {!isCameraActive ? (
-                                    <button onClick={startCamera} className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] shadow-lg">فتح الكاميرا 📸</button>
-                                 ) : (
-                                    <button onClick={stopCamera} className="px-6 py-3 bg-rose-500 text-white rounded-2xl font-black text-[10px] shadow-lg">إلغاء</button>
-                                 )}
-                                 <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-[10px] shadow-sm">رفع من الجهاز 📁</button>
-                                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                              <div>
+                                 <h3 className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">{g.name}</h3>
+                                 <p className="text-slate-400 text-xs mt-1">{g.time}</p>
                               </div>
                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <div className="space-y-2 col-span-full">
-                              <label className="text-[10px] font-black text-slate-400 px-4 uppercase">الاسم الكامل</label>
-                              <input type="text" placeholder="مثال: أحمد محمد علي" className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-3xl font-black text-md outline-none transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                           </div>
-                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-400 px-4 uppercase">هاتف الطالب</label>
-                              <input type="tel" className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-3xl font-black text-md outline-none transition-all text-left" dir="ltr" value={formData.studentPhone} onChange={e => setFormData({...formData, studentPhone: e.target.value})} />
-                           </div>
-                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-400 px-4 uppercase">هاتف ولي الأمر</label>
-                              <input type="tel" className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-3xl font-black text-md outline-none transition-all text-left" dir="ltr" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} />
-                           </div>
-                        </div>
-
-                        <div className="pt-6">
-                           <button onClick={handleSubmit} className="w-full py-7 bg-blue-600 text-white rounded-[2.5rem] font-black text-xl shadow-2xl hover:scale-[1.02] active:scale-95 transition-all">تأكيد الاشتراك 🚀</button>
-                        </div>
-                     </div>
+                           <div className="text-slate-500 text-xl group-hover:translate-x-[-5px] transition-transform">⭠</div>
+                        </button>
+                      ))}
+                   </div>
+                   {groups.filter(g => g.yearId === formData.yearId).length === 0 && (
+                      <div className="text-center py-20 border-2 border-dashed border-slate-700 rounded-[2rem]">
+                         <span className="text-4xl block mb-2">⚠️</span>
+                         <p className="text-slate-400 font-bold">لا توجد مجموعات متاحة لهذا الصف حالياً</p>
+                      </div>
                    )}
+                   <button onClick={() => setStep(1)} className="text-slate-400 hover:text-white text-xs font-bold py-4">← تغيير الصف الدراسي</button>
                 </div>
-             </div>
-          </div>
-       </div>
+              )}
+
+              {/* Step 3: Profile */}
+              {step === 3 && (
+                <div className="space-y-8 animate-slideUp">
+                   {/* Avatar Scanner */}
+                   <div className="flex justify-center mb-8">
+                      <div className="relative group">
+                         <div className={`w-40 h-40 rounded-[3rem] overflow-hidden border-4 ${isCameraActive ? 'border-blue-500 shadow-[0_0_30px_#3b82f6]' : 'border-white/20'} bg-slate-900 relative transition-all`}>
+                            {isCameraActive ? (
+                               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                            ) : (
+                               <img src={formData.avatar} className="w-full h-full object-cover" alt="Avatar" />
+                            )}
+                            {/* Scanning Line Animation */}
+                            {isCameraActive && (
+                               <div className="absolute top-0 left-0 w-full h-1 bg-blue-400 shadow-[0_0_10px_#60a5fa] animate-[scan_1.5s_ease-in-out_infinite]"></div>
+                            )}
+                         </div>
+                         
+                         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                            <button 
+                              onClick={isCameraActive ? capturePhoto : startCamera}
+                              className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                              title={isCameraActive ? "التقاط" : "فتح الكاميرا"}
+                            >
+                               {isCameraActive ? '📸' : '📷'}
+                            </button>
+                            <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-10 h-10 bg-slate-700 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                              title="رفع صورة"
+                            >
+                               📁
+                            </button>
+                         </div>
+                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <div className="relative group">
+                         <span className="absolute top-4 right-4 text-slate-500 group-focus-within:text-blue-500 transition-colors">👤</span>
+                         <input 
+                           type="text" 
+                           placeholder="اسمك الثلاثي" 
+                           className="w-full pl-4 pr-12 py-4 bg-slate-800/50 border border-white/10 rounded-2xl text-white font-bold placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-all"
+                           value={formData.name}
+                           onChange={e => setFormData({...formData, name: e.target.value})}
+                         />
+                      </div>
+                      <div className="relative group">
+                         <span className="absolute top-4 right-4 text-slate-500 group-focus-within:text-blue-500 transition-colors">📱</span>
+                         <input 
+                           type="tel" 
+                           placeholder="رقم هاتفك" 
+                           className="w-full pl-4 pr-12 py-4 bg-slate-800/50 border border-white/10 rounded-2xl text-white font-bold placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-all"
+                           value={formData.studentPhone}
+                           onChange={e => setFormData({...formData, studentPhone: e.target.value})}
+                         />
+                      </div>
+                      <div className="relative group">
+                         <span className="absolute top-4 right-4 text-slate-500 group-focus-within:text-blue-500 transition-colors">👨‍👩‍👦</span>
+                         <input 
+                           type="tel" 
+                           placeholder="رقم ولي الأمر" 
+                           className="w-full pl-4 pr-12 py-4 bg-slate-800/50 border border-white/10 rounded-2xl text-white font-bold placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-all"
+                           value={formData.parentPhone}
+                           onChange={e => setFormData({...formData, parentPhone: e.target.value})}
+                         />
+                      </div>
+                   </div>
+
+                   <div className="flex gap-4 pt-4">
+                      <button onClick={() => setStep(2)} className="px-6 py-4 rounded-2xl border border-white/10 text-slate-400 font-bold hover:bg-white/5 transition-all">رجوع</button>
+                      <button 
+                        onClick={handleSubmit}
+                        className="flex-1 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-blue-900/50 hover:shadow-blue-600/40 hover:scale-[1.02] transition-all"
+                      >
+                         تأكيد التسجيل 🚀
+                      </button>
+                   </div>
+                </div>
+              )}
+
+           </div>
+        </div>
+      </div>
+
+      {/* Hidden Helper Canvas */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      <style>{`
+        @keyframes scan {
+          0%, 100% { top: 0%; }
+          50% { top: 100%; }
+        }
+      `}</style>
     </div>
   );
 };

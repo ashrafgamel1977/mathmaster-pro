@@ -22,7 +22,9 @@ export enum AppView {
   NOTIFICATIONS = 'NOTIFICATIONS',
   FORMULAS = 'FORMULAS',
   REGISTRATION = 'REGISTRATION',
-  REWARDS = 'REWARDS'
+  REWARDS = 'REWARDS',
+  CONTROL_PANEL = 'CONTROL_PANEL',
+  SECTIONS = 'SECTIONS'
 }
 
 export type PortalTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'slate' | 'violet';
@@ -110,7 +112,7 @@ export interface Group {
   codePrefix?: string;
 }
 export interface Quiz { id: string; title: string; yearId: string; date: string; type: string; questions?: any[]; }
-export interface QuizResult { id: string; studentId: string; quizId: string; quizTitle: string; score: number; status: 'pending' | 'graded'; date: string; handwrittenUrl?: string; aiFeedback?: string; feedback?: string; }
+export interface QuizResult { id: string; studentId: string; quizId: string; quizTitle: string; score: number; status: 'pending' | 'graded'; date: string; handwrittenUrl?: string; aiFeedback?: string; feedback?: string; isCheatSuspected?: boolean; }
 
 export interface Assignment {
   id: string;
@@ -231,10 +233,28 @@ export interface AppNotification {
   isRead: boolean;
 }
 
+// New Branding Interfaces
+export interface BrandingSettings {
+  primaryColor: string;
+  secondaryColor: string;
+  logoUrl?: string;
+  heroImageUrl?: string;
+  faviconUrl?: string;
+}
+
+export interface ContentTextSettings {
+  landingTitle: string;
+  landingSubtitle: string;
+  studentWelcomeTitle: string;
+  studentWelcomeSubtitle: string;
+  dashboardTitle: string;
+}
+
 export interface PlatformSettings {
   teacherName: string;
   platformName: string;
-  studentWelcomeMsg: string; 
+  adminCode: string; 
+  studentWelcomeMsg: string; // Deprecated, use contentTexts
   parentWelcomeMsg: string;  
   protectionEnabled: boolean;
   watermarkEnabled: boolean;
@@ -252,8 +272,13 @@ export interface PlatformSettings {
   enableLeaderboard: boolean;
   enableAiSolver: boolean;
   examMode: boolean;
+  integrityMode: boolean;
   maxDevicesPerStudent: number;
   viewLabels?: Record<string, string>;
   enabledViews?: string[];
   customSections?: CustomSection[];
+  
+  // New Settings Objects
+  branding: BrandingSettings;
+  contentTexts: ContentTextSettings;
 }

@@ -13,12 +13,14 @@ interface AssignmentsViewProps {
   teacherName: string;
   notation: MathNotation;
   onAdd: (a: Assignment) => void;
+  onUpdate: (a: Assignment) => void; // New Prop for updating
   onDelete: (id: string) => void;
   onGrade: (submissionId: string, grade: number, feedback: string, correctedImg?: string) => void;
 }
 
-const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissions, students, years, teacherName, notation, onAdd, onDelete, onGrade }) => {
+const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissions, students, years, teacherName, notation, onAdd, onUpdate, onDelete, onGrade }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedAsgId, setSelectedAsgId] = useState<string | null>(null);
   const [gradingSub, setGradingSub] = useState<AssignmentSubmission | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'link' | 'file' | 'board'>('board');
@@ -27,12 +29,14 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
   const fileTypeInputRef = useRef<HTMLInputElement>(null);
   
   const [newAsg, setNewAsg] = useState<{ 
+    id?: string;
     title: string; 
     desc: string; 
     dueDate: string; 
     yearId: string; 
     externalLink: string;
     fileUrl: string;
+    status: 'active' | 'archived';
     attachments: AssignmentAttachment[] 
   }>({ 
     title: '', 
@@ -41,13 +45,21 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     yearId: '',
     externalLink: '',
     fileUrl: '',
+    status: 'active',
     attachments: []
   });
 
-  const handleAdd = () => {
+  const resetForm = () => {
+    setNewAsg({ title: '', desc: '', dueDate: '', yearId: '', externalLink: '', fileUrl: '', status: 'active', attachments: [] });
+    setIsEditing(false);
+    setShowAdd(false);
+  };
+
+  const handleSave = () => {
     if (!newAsg.title || !newAsg.yearId) return alert('يرجى إكمال العنوان والصف الدراسي');
-    onAdd({
-      id: 'asg' + Date.now(),
+    
+    const assignmentData: Assignment = {
+      id: isEditing && newAsg.id ? newAsg.id : 'asg' + Date.now(),
       title: newAsg.title,
       description: newAsg.desc,
       dueDate: newAsg.dueDate || new Date().toLocaleDateString('ar-EG'),
@@ -55,12 +67,39 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       type: activeTab,
       externalLink: activeTab === 'link' ? newAsg.externalLink : undefined,
       fileUrl: (activeTab === 'file' || activeTab === 'board') ? newAsg.fileUrl : undefined,
-      status: 'active',
-      submissions: 0,
+      status: newAsg.status,
+      submissions: isEditing ? (assignments.find(a => a.id === newAsg.id)?.submissions || 0) : 0,
       attachments: newAsg.attachments
+    };
+
+    if (isEditing) {
+      onUpdate(assignmentData);
+    } else {
+      onAdd(assignmentData);
+    }
+    resetForm();
+  };
+
+  const handleEditClick = (e: React.MouseEvent, asg: Assignment) => {
+    e.stopPropagation();
+    setNewAsg({
+      id: asg.id,
+      title: asg.title,
+      desc: asg.description,
+      dueDate: asg.dueDate,
+      yearId: asg.yearId,
+      externalLink: asg.externalLink || '',
+      fileUrl: asg.fileUrl || '',
+      status: asg.status as 'active' | 'archived',
+      attachments: asg.attachments || []
     });
-    setShowAdd(false);
-    setNewAsg({ title: '', desc: '', dueDate: '', yearId: '', externalLink: '', fileUrl: '', attachments: [] });
+    // Set active tab based on existing data
+    if (asg.fileUrl) setActiveTab(asg.description.includes('السبورة') ? 'board' : 'file');
+    else if (asg.externalLink) setActiveTab('link');
+    else setActiveTab('text');
+
+    setIsEditing(true);
+    setShowAdd(true);
   };
 
   const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,7 +158,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
             {isEnglish ? 'النمط الإنجليزي مفعل (Math Notation)' : 'النمط العربي مفعل (الرموز العربية)'}
           </p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="px-12 py-5 bg-white text-indigo-950 rounded-[2rem] font-black text-sm shadow-2xl hover:scale-105 transition-transform relative z-10">إضافة واجب ＋</button>
+        <button onClick={() => { resetForm(); setShowAdd(true); }} className="px-12 py-5 bg-white text-indigo-950 rounded-[2rem] font-black text-sm shadow-2xl hover:scale-105 transition-transform relative z-10">إضافة واجب ＋</button>
       </div>
 
       {!selectedAsgId ? (
@@ -128,17 +167,22 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
             <div key={asg.id} onClick={() => setSelectedAsgId(asg.id)} className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden flex flex-col h-full group">
                <div className="flex justify-between items-start mb-4">
                   <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">{years.find(y=>y.id===asg.yearId)?.name}</span>
-                  <button onClick={(e) => { e.stopPropagation(); onDelete(asg.id); }} className="text-rose-300 hover:text-rose-500 transition-colors">🗑️</button>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => handleEditClick(e, asg)} className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 flex items-center justify-center transition-all shadow-sm">✎</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(asg.id); }} className="w-8 h-8 rounded-full bg-slate-50 text-rose-300 hover:bg-rose-50 hover:text-rose-500 flex items-center justify-center transition-all shadow-sm">🗑️</button>
+                  </div>
                </div>
                <h3 className="text-xl font-black text-gray-800 mb-2 leading-tight group-hover:text-indigo-600 transition-colors">{asg.title}</h3>
                <div className="text-xs text-gray-400 font-bold line-clamp-3 mb-6">
                   <MathRenderer content={asg.description} inline />
                </div>
                <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-center">
-                  <span className="text-[10px] text-gray-400 font-black">📅 الموعد: {asg.dueDate}</span>
+                  <span className="text-[10px] text-gray-400 font-black">📅 التسليم: {asg.dueDate}</span>
                   <div className="flex items-center gap-2">
-                     <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                     <span className="text-[10px] font-black text-emerald-600">نشط</span>
+                     <span className={`w-2 h-2 rounded-full ${asg.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                     <span className={`text-[10px] font-black ${asg.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                       {asg.status === 'active' ? 'نشط' : 'مغلق'}
+                     </span>
                   </div>
                </div>
             </div>
@@ -205,11 +249,14 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
 
       {showAdd && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-indigo-950/60 backdrop-blur-sm animate-fadeIn" onClick={() => setShowAdd(false)}></div>
+          <div className="absolute inset-0 bg-indigo-950/60 backdrop-blur-sm animate-fadeIn" onClick={resetForm}></div>
           <div className="bg-white w-full max-w-4xl rounded-[4rem] p-10 relative z-10 animate-slideUp overflow-y-auto max-h-[90vh] shadow-2xl no-scrollbar">
             <div className="flex justify-between items-center mb-8 border-b border-slate-50 pb-6">
-              <h3 className="text-3xl font-black text-gray-800 flex items-center gap-3"><span>🚀</span> إضافة واجب جديد</h3>
-              <button onClick={() => setShowAdd(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+              <h3 className="text-3xl font-black text-gray-800 flex items-center gap-3">
+                <span>{isEditing ? '✎' : '🚀'}</span> 
+                {isEditing ? 'تعديل الواجب' : 'إضافة واجب جديد'}
+              </h3>
+              <button onClick={resetForm} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
             </div>
             
             <div className="space-y-8">
@@ -229,17 +276,14 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">الموعد النهائي للتسليم</label>
+                    <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">تاريخ آخر موعد للتسليم</label>
                     <input type="date" className="w-full px-8 py-5 bg-gray-50 rounded-[2rem] font-black outline-none border-2 border-transparent focus:border-indigo-600 shadow-inner" value={newAsg.dueDate} onChange={e => setNewAsg({...newAsg, dueDate: e.target.value})} />
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">نوع الواجب</label>
+                    <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">حالة الواجب</label>
                     <div className="flex bg-gray-100 p-1.5 rounded-[2rem]">
-                      {['board', 'file', 'link', 'text'].map(t => (
-                        <button key={t} onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 rounded-2xl text-[9px] font-black transition-all ${activeTab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                          {t === 'board' ? 'سبورة' : t === 'file' ? 'ملف' : t === 'link' ? 'رابط' : 'نص'}
-                        </button>
-                      ))}
+                       <button onClick={() => setNewAsg({...newAsg, status: 'active'})} className={`flex-1 py-3 rounded-2xl text-[10px] font-black transition-all ${newAsg.status === 'active' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}>نشط (يستقبل)</button>
+                       <button onClick={() => setNewAsg({...newAsg, status: 'archived'})} className={`flex-1 py-3 rounded-2xl text-[10px] font-black transition-all ${newAsg.status === 'archived' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-400'}`}>مغلق (مؤرشف)</button>
                     </div>
                  </div>
                </div>
@@ -254,6 +298,18 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                     value={newAsg.desc}
                     onChange={e => setNewAsg({...newAsg, desc: e.target.value})}
                   />
+               </div>
+
+               {/* Attachment Type Selection */}
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">نوع المرفق الأساسي</label>
+                  <div className="flex bg-gray-100 p-1.5 rounded-[2rem]">
+                    {['board', 'file', 'link', 'text'].map(t => (
+                      <button key={t} onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 rounded-2xl text-[9px] font-black transition-all ${activeTab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                        {t === 'board' ? 'سبورة' : t === 'file' ? 'ملف' : t === 'link' ? 'رابط' : 'نص'}
+                      </button>
+                    ))}
+                  </div>
                </div>
 
                {/* Conditional Inputs based on Tab */}
@@ -319,7 +375,9 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                  )}
                </div>
 
-               <button onClick={handleAdd} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-2xl text-xl hover:scale-[1.01] transition-transform">بث الواجب لطلابك الآن 🚀</button>
+               <button onClick={handleSave} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-2xl text-xl hover:scale-[1.01] transition-transform">
+                 {isEditing ? 'حفظ التعديلات ✓' : 'بث الواجب لطلابك الآن 🚀'}
+               </button>
             </div>
           </div>
         </div>

@@ -43,6 +43,31 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
     setNewVideo({ title: '', url: '', yearId: '', thumbnailUrl: '' });
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setNewDoc({ ...newDoc, data: ev.target?.result as string, mimeType: file.type });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddDocLocal = () => {
+    if (!newDoc.name || !newDoc.yearId || !newDoc.data) return alert('يرجى إكمال البيانات ورفع الملف');
+    onAddSource({
+      id: 'src' + Date.now(),
+      name: newDoc.name,
+      data: newDoc.data,
+      mimeType: newDoc.mimeType,
+      yearId: newDoc.yearId,
+      uploadDate: new Date().toLocaleDateString('ar-EG')
+    });
+    setShowAddDoc(false);
+    setNewDoc({ name: '', yearId: '', data: '', mimeType: '' });
+  };
+
   return (
     <div className="space-y-12 animate-slideUp pb-24 max-w-7xl mx-auto text-right font-['Cairo']" dir="rtl">
       {/* Header Panel */}
@@ -100,7 +125,7 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
            ))
          ) : (
            filteredSources.map(doc => (
-             <div key={doc.id} className="pro-card p-8 rounded-[3rem] flex items-center gap-6 group">
+             <div key={doc.id} className="pro-card p-8 rounded-[3rem] flex items-center gap-6 group bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all">
                 <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[1.5rem] flex items-center justify-center text-3xl shrink-0 shadow-inner group-hover:scale-110 transition-transform">
                    📄
                 </div>
@@ -114,6 +139,7 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
          )}
       </div>
 
+      {/* Video Modal */}
       {showAddVideo && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl space-y-6">
@@ -127,6 +153,37 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
             <div className="flex gap-4">
               <button onClick={handleAddVideoLocal} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black">حفظ</button>
               <button onClick={() => setShowAddVideo(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal (Fixed to solve unused variables) */}
+      {showAddDoc && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl space-y-6">
+            <h3 className="text-2xl font-black text-slate-800">إضافة ملف أو ملزمة</h3>
+            <input type="text" placeholder="اسم الملف" className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none border focus:border-blue-600" value={newDoc.name} onChange={e => setNewDoc({...newDoc, name: e.target.value})} />
+            <select className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none border focus:border-blue-600" value={newDoc.yearId} onChange={e => setNewDoc({...newDoc, yearId: e.target.value})}>
+               <option value="">اختر الصف</option>
+               {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+            </select>
+            
+            <div 
+              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
+              onClick={() => docInputRef.current?.click()}
+            >
+               {newDoc.data ? (
+                 <p className="text-emerald-600 font-bold text-xs">تم اختيار الملف بنجاح ✓</p>
+               ) : (
+                 <p className="text-slate-400 font-bold text-xs">اضغط لرفع الملف (PDF / صور)</p>
+               )}
+               <input type="file" ref={docInputRef} className="hidden" accept=".pdf,image/*" onChange={handleFileUpload} />
+            </div>
+
+            <div className="flex gap-4">
+              <button onClick={handleAddDocLocal} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black">نشر الملف</button>
+              <button onClick={() => setShowAddDoc(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black">إلغاء</button>
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -16,9 +17,13 @@ interface ErrorBoundaryState {
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Explicitly declare state as a property to fix TS error: Property 'state' does not exist on type 'ErrorBoundary' (Lines 20, 33)
   public state: ErrorBoundaryState = { hasError: false };
+  // Explicitly declare props as a property to fix TS error: Property 'props' does not exist on type 'ErrorBoundary' (Line 47)
+  public props: ErrorBoundaryProps;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    // Explicitly set props to resolve TS error
+    this.props = props;
     // State is initialized above as a class property
   }
 

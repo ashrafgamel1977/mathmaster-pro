@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'mathmaster-pro-v2';
+const CACHE_NAME = 'mathmaster-pro-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -28,24 +28,32 @@ self.addEventListener('fetch', (event) => {
 
 // التعامل مع الإشعارات الفورية القادمة (Push Events)
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {
-    title: 'تنبيه جديد من الأستاذ أشرف جميل',
-    body: 'لديك تحديث جديد في منصة الرياضيات، اضغط للمتابعة.',
-    icon: 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png'
-  };
+  let data = { title: 'تنبيه جديد', body: 'لديك تحديث في منصة الرياضيات', url: './index.html' };
+  
+  if (event.data) {
+    try {
+      // محاولة قراءة البيانات كـ JSON إذا كانت مرسلة من السيرفر
+      data = event.data.json();
+    } catch (e) {
+      // إذا كانت نصاً عادياً
+      data.body = event.data.text();
+    }
+  }
 
   const options = {
     body: data.body,
-    icon: data.icon || 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png',
+    icon: 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png',
     badge: 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png',
-    vibrate: [200, 100, 200],
+    vibrate: [100, 50, 100],
     data: {
-      url: data.url || './index.html'
+      url: data.url || './index.html',
+      dateOfArrival: Date.now()
     },
     actions: [
-      { action: 'open', title: 'عرض الآن 📖' },
-      { action: 'close', title: 'إغلاق' }
-    ]
+      { action: 'open', title: 'عرض التفاصيل 👁️' },
+    ],
+    dir: 'rtl',
+    lang: 'ar'
   };
 
   event.waitUntil(
@@ -57,18 +65,20 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
+  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      if (clientList.length > 0) {
-        let client = clientList[0];
-        for (let i = 0; i < clientList.length; i++) {
-          if (clientList[i].focused) {
-            client = clientList[i];
-          }
+      // محاولة العثور على نافذة مفتوحة بالفعل
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
         }
-        return client.focus();
       }
-      return clients.openWindow(event.notification.data.url);
+      // إذا لم توجد، فتح نافذة جديدة
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
     })
   );
 });

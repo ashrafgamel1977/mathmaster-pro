@@ -5,14 +5,14 @@ import { PlatformSettings, EducationalSource } from '../types';
 import InteractiveBoard from '../components/InteractiveBoard';
 
 interface LiveClassProps {
-  teacherName: string;
+  teacherName: string; // Kept in interface for compatibility, but removed from destructuring if unused, or we remove it entirely if not passed.
   settings: PlatformSettings;
   onUpdateSettings: (settings: PlatformSettings) => void;
   onBroadcastToWhatsApp: () => void;
   onPostSummary: (source: EducationalSource) => void;
 }
 
-const LiveClass: React.FC<LiveClassProps> = ({ teacherName, settings, onUpdateSettings, onBroadcastToWhatsApp, onPostSummary }) => {
+const LiveClass: React.FC<LiveClassProps> = ({ settings, onUpdateSettings, onBroadcastToWhatsApp, onPostSummary }) => {
   const [isAiActive, setIsAiActive] = useState(false);
   const [aiStatus, setAiStatus] = useState('المعلم الذكي جاهز للمساعدة');
   const [showBoard, setShowBoard] = useState(false);

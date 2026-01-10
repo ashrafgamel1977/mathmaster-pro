@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AppView, PlatformSettings } from '../types';
+import { AppView, PlatformSettings, Assistant } from '../types';
 
 interface BottomNavProps {
   currentView: AppView | string;
@@ -8,17 +8,20 @@ interface BottomNavProps {
   settings: PlatformSettings;
   pendingCount?: number;
   unreadChatCount?: number;
+  loggedUser?: any;
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, pendingCount = 0, unreadChatCount = 0 }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, pendingCount = 0, unreadChatCount = 0, loggedUser }) => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const isAssistant = loggedUser?.role === 'assistant';
+  const permissions = isAssistant ? (loggedUser as Assistant).permissions : Object.values(AppView);
 
   const mainItems = [
     { id: AppView.DASHBOARD, label: settings.viewLabels?.[AppView.DASHBOARD] || 'الرئيسية', icon: '🏠' },
     { id: AppView.STUDENTS, label: settings.viewLabels?.[AppView.STUDENTS] || 'الطلاب', icon: '👥' },
     { id: AppView.CHAT, label: settings.viewLabels?.[AppView.CHAT] || 'النقاش', icon: '💬', showChatDot: true },
     { id: AppView.QUIZZES, label: settings.viewLabels?.[AppView.QUIZZES] || 'المختبر', icon: '📝' },
-  ];
+  ].filter(item => isAssistant ? permissions.includes(item.id as AppView) : true);
 
   const moreItemsBase = [
     { id: AppView.RESULTS, label: settings.viewLabels?.[AppView.RESULTS] || 'النتائج', icon: '📊', showDot: true },
@@ -28,7 +31,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, p
     { id: AppView.LIVE_CLASS, label: settings.viewLabels?.[AppView.LIVE_CLASS] || 'البث', icon: '🎥' },
     { id: AppView.FILES, label: settings.viewLabels?.[AppView.FILES] || 'المكتبة', icon: '📁' },
     { id: AppView.AI_SOLVER, label: settings.viewLabels?.[AppView.AI_SOLVER] || 'المحلل', icon: '🧠' },
-  ];
+  ].filter(item => isAssistant ? permissions.includes(item.id as AppView) : true);
 
   const customItems = (settings.customSections || []).map(s => ({
     id: s.id,
@@ -37,12 +40,15 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, p
     showDot: false
   }));
 
-  const allMoreItems = [...moreItemsBase, ...customItems, { id: AppView.SETTINGS, label: 'الإعدادات', icon: '⚙️', showDot: false }];
+  const allMoreItems = [...moreItemsBase, ...customItems];
+  if (!isAssistant) {
+     allMoreItems.push({ id: AppView.SETTINGS, label: 'الإعدادات', icon: '⚙️', showDot: false });
+  }
 
   return (
     <>
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] lg:hidden w-[92%] max-w-md">
-        <nav className="bg-slate-900/60 backdrop-blur-3xl rounded-[2.5rem] shadow-2xl border border-white/10 p-2 flex justify-around items-center h-20">
+        <nav className="bg-slate-900/80 backdrop-blur-3xl rounded-[2.5rem] shadow-2xl border border-white/10 p-2 flex justify-around items-center h-20">
           {mainItems.map((item) => {
             const hasDot = (item.showChatDot && unreadChatCount > 0);
             const isActive = currentView === item.id;
@@ -99,6 +105,15 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, p
                   )}
                 </button>
               ))}
+              {isAssistant && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex flex-col items-center gap-3 p-5 rounded-[2rem] bg-rose-500/10 text-rose-500"
+                >
+                  <span className="text-2xl">🚪</span>
+                  <span className="text-[9px] font-black text-center leading-tight">خروج</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

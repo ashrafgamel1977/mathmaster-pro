@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { PlatformReward, RewardRedemption, Student, AppView } from '../types';
+import { PlatformReward, RewardRedemption, Student } from '../types';
 
 interface RewardsProps {
   rewards: PlatformReward[];

@@ -14,7 +14,6 @@ interface CallCenterProps {
 const CallCenter: React.FC<CallCenterProps> = ({ inquiries, callLogs, students, onUpdateInquiry, onAddCallLog, teacherName }) => {
   const [activeTab, setActiveTab] = useState<'inquiries' | 'logs'>('inquiries');
   const [showLogModal, setShowLogModal] = useState(false);
-  const [selectedInquiry, setSelectedInquiry] = useState<ParentInquiry | null>(null);
   const [newLog, setNewLog] = useState({ studentId: '', parentName: '', note: '' });
 
   const getPriorityColor = (p: string) => {
