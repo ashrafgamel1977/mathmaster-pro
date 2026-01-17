@@ -30,6 +30,7 @@ export enum AppView {
 export type PortalTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'slate' | 'violet';
 export type PortalLayout = 'default' | 'compact' | 'stats-focused' | 'modern';
 export type MathNotation = 'arabic' | 'english';
+export type AppFont = 'Cairo' | 'Tajawal' | 'Almarai' | 'El Messiri';
 
 export interface Assistant {
   id: string;
@@ -102,6 +103,7 @@ export interface Student {
   lastReadNotificationId?: string;
   lastSpinDate?: string;
   preferences?: StudentPreferences;
+  lastReportDate?: string; // New field for tracking reports
 }
 
 export interface Year { id: string; name: string; }
@@ -152,6 +154,11 @@ export interface AssignmentSubmission {
   aiAnalysis?: string;
 }
 
+export interface Rating {
+  studentId: string;
+  value: number;
+}
+
 export interface EducationalSource {
   id: string;
   name: string;
@@ -159,6 +166,7 @@ export interface EducationalSource {
   mimeType: string;
   uploadDate: string;
   yearId: string;
+  ratings?: Rating[];
 }
 
 export interface ScheduleEntry {
@@ -194,10 +202,19 @@ export interface ChatMessage {
 export interface VideoLesson {
   id: string;
   title: string;
-  youtubeUrl: string;
+  youtubeUrl: string; // Used for URL irrespective of provider
+  provider?: 'youtube' | 'bunny' | 'native'; // New field to identify source
   yearId: string;
   uploadDate: string;
   thumbnailUrl?: string;
+}
+
+export interface VideoNote {
+  id: string;
+  videoId: string;
+  timestamp: number; // in seconds
+  text: string;
+  createdAt: string;
 }
 
 export interface VideoView {
@@ -243,9 +260,11 @@ export interface AppNotification {
 export interface BrandingSettings {
   primaryColor: string;
   secondaryColor: string;
+  fontFamily: AppFont; // New Font Setting
   logoUrl?: string;
   heroImageUrl?: string;
   faviconUrl?: string;
+  sidebarGradient?: string; // New: Sidebar background gradient
 }
 
 export interface ContentTextSettings {
@@ -254,6 +273,24 @@ export interface ContentTextSettings {
   studentWelcomeTitle: string;
   studentWelcomeSubtitle: string;
   dashboardTitle: string;
+}
+
+export interface DashboardWidgets {
+  showStats: boolean;
+  showQuickActions: boolean;
+  showLeaderboard: boolean;
+  showTools: boolean;
+}
+
+// New Interface for Tab Management
+export interface TabFeature {
+  id: string;
+  label: string;
+  enabled: boolean;
+}
+
+export interface FeatureConfig {
+  [viewId: string]: TabFeature[];
 }
 
 export interface PlatformSettings {
@@ -281,10 +318,13 @@ export interface PlatformSettings {
   integrityMode: boolean;
   maxDevicesPerStudent: number;
   viewLabels?: Record<string, string>;
+  viewIcons?: Record<string, string>;
   enabledViews?: string[];
   customSections?: CustomSection[];
   
   // New Settings Objects
   branding: BrandingSettings;
   contentTexts: ContentTextSettings;
+  dashboardWidgets?: DashboardWidgets; 
+  featureConfig?: FeatureConfig; // New: Internal tabs config
 }

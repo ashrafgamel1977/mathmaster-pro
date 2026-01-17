@@ -4,12 +4,33 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+}
+
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* PWA Optimizations */
+  overscroll-behavior-y: none; /* يمنع "نطاطية" الصفحة عند السحب في الموبايل */
+  -webkit-tap-highlight-color: transparent; /* يزيل الوميض الأزرق المزعج عند النقر */
+  touch-action: manipulation; /* يحسن استجابة اللمس */
+  user-select: none; /* يمنع تحديد النصوص بشكل عام ليعطي شعور التطبيق */
+}
+
+/* السماح بتحديد النص فقط داخل حقول الكتابة والمحتوى التعليمي */
+input, textarea, select, .selectable-text, .math-content {
+  user-select: text;
+}
+
+/* منع التكبير التلقائي المزعج في آيفون عند الكتابة */
+input, textarea, select {
+  font-size: 16px !important; 
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -19,4 +40,11 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* تحسينات للعرض بملء الشاشة */
+@media (display-mode: standalone) {
+  body {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
 }

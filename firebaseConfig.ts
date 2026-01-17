@@ -3,34 +3,40 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
 // ============================================================================
-// منطقة التعديل (أهم خطوة)
-// ============================================================================
-// 1. امسح كل ما بداخل القوسين { } في الأسفل
-// 2. الصق الكود الذي نسخته من Firebase (الذي يبدأ بـ apiKey, authDomain...)
+// 🛑 منطقة التعديل: هنا تضع "المفتاح" الذي جلبته من موقع Firebase
 // ============================================================================
 
 const PERMANENT_CONFIG = {
-
-  apiKey:"AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",  
-  authDomain: "mathmaster-pri.firebaseapp.com",  
-  projectId: "mathmaster-pri",  
-  storageBucket:"mathmaster-pri.firebasestorage.app",
-  messagingSenderId: "784442354442",  
-  appId:"1:784442354442:web:5a0b4772c144d4e01228f3",  
-  // ---------------------------------------------------------
+  // 1. انسخ الـ apiKey من موقع Firebase وضعه هنا بدلاً من النص الموجود
+  apiKey: "AIzaSyD-YOUR_API_KEY_HERE", 
+  
+  // 2. انسخ الـ authDomain وضعه هنا
+  authDomain: "your-project-id.firebaseapp.com",
+  
+  // 3. انسخ الـ projectId وضعه هنا (مهم جداً)
+  projectId: "your-project-id",
+  
+  // 4. انسخ الـ storageBucket وضعه هنا
+  storageBucket: "your-project-id.appspot.com",
+  
+  // 5. انسخ الـ messagingSenderId وضعه هنا
+  messagingSenderId: "123456789",
+  
+  // 6. انسخ الـ appId وضعه هنا
+  appId: "1:123456789:web:abcdef"
 };
 
 // ============================================================================
-// لا تقم بتعديل أي شيء أسفل هذا الخط
+// لا تقم بتعديل أي شيء أسفل هذا الخط ⛔
 // ============================================================================
 
 const getConfig = () => {
-  // If user put real data in PERMANENT_CONFIG, use it
+  // استخدام البيانات المباشرة إذا تم تعديلها من قبل المبرمج
   if (PERMANENT_CONFIG.apiKey && !PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
     return PERMANENT_CONFIG;
   }
 
-  // Otherwise, try local storage (for development/owner only)
+  // محاولة جلب الإعدادات من الذاكرة المؤقتة (للمعاينة السريعة)
   try {
     const stored = localStorage.getItem('math_firebase_config');
     if (stored) {
@@ -50,15 +56,15 @@ let db: Firestore;
 try {
   app = initializeApp(config);
   db = getFirestore(app);
+  console.log("Firebase Initialized with Project:", config.projectId);
 } catch (error) {
-  console.error("Firebase Init Error:", error);
-  // Fail gracefully to allow ConfigScreen to show
+  console.error("Firebase Init Error - تأكد من وضع مفاتيح الربط الصحيحة في ملف firebaseConfig.ts", error);
 }
 
 export { db };
 
+// دوال مساعدة للتحقق من الحالة
 export const isUsingDefaultConfig = () => {
-  // Returns true if we are still using placeholders (need to show setup screen)
   if (PERMANENT_CONFIG.apiKey && !PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
     return false;
   }

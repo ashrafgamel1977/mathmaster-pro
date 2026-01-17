@@ -1,745 +1,808 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  AppView, PlatformSettings, Student, AppNotification, 
-  Year, QuizResult, AssignmentSubmission, Group, Assignment, MathFormula, Quiz, VideoLesson, ChatMessage, EducationalSource, ParentInquiry, CallLog, Assistant, ScheduleEntry,
-  PlatformReward, RewardRedemption, CustomSection
+  AppView, PlatformSettings, Student, Year, Group, Quiz, Assignment, 
+  AssignmentSubmission, QuizResult, VideoLesson, EducationalSource, 
+  ChatMessage, AppNotification, Assistant, ParentInquiry, CallLog, 
+  ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, VideoView, VideoNote, CustomSection
 } from './types';
 
-// Services
-import { subscribeToCollection, saveData, removeData, updatePartialData } from './services/firebaseService';
-import { saveConfig, isUsingDefaultConfig, resetConfig } from './firebaseConfig';
-
+// Views
+import LandingPage from './views/LandingPage';
 import Dashboard from './views/Dashboard';
-import Sidebar from './components/Sidebar';
-import StudentList from './components/StudentList';
 import StudentPortal from './views/StudentPortal';
 import ParentPortal from './views/ParentPortal';
+import StudentList from './components/StudentList';
 import AssignmentsView from './views/Assignments';
-import LandingPage from './views/LandingPage';
-import Registration from './views/Registration';
-import AdminControlPanel from './views/AdminControlPanel';
-import AISolver from './views/AISolver';
-import FilesView from './views/Files';
-import LiveClass from './views/LiveClass';
-import ChatRoom from './views/ChatRoom';
 import QuizGenerator from './views/QuizGenerator';
+import LiveClass from './views/LiveClass';
+import FilesView from './views/Files';
+import Management from './views/Management';
+import QuizResults from './views/QuizResults';
+import Settings from './views/Settings';
+import ChatRoom from './views/ChatRoom';
+import CallCenter from './views/CallCenter';
+import TestCenter from './views/TestCenter';
+import LaunchGuide from './views/LaunchGuide';
+import Leaderboard from './views/Leaderboard';
+import AISolver from './views/AISolver';
+import Notifications from './views/Notifications';
 import Formulas from './views/Formulas';
+import Registration from './views/Registration';
+import Rewards from './views/Rewards';
+import AdminControlPanel from './views/AdminControlPanel';
+import Schedules from './views/Schedules';
 import Sections from './views/Sections';
+
+// Components
+import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
-import { ToastContainer } from './components/Toast';
-import MathRenderer from './components/MathRenderer';
+import { ToastContainer, ToastProps } from './components/Toast';
 import InstallPWA from './components/InstallPWA';
 
-// --- CONFIG SCREEN COMPONENT ---
-const ConfigScreen = ({ onSave, initialError }: { onSave: (config: any) => void, initialError?: string | null }) => {
-  const [inputStr, setInputStr] = useState('');
-  const [manualConfig, setManualConfig] = useState(() => {
-    // Try to pre-fill with existing config from local storage if available
-    try {
-        const stored = localStorage.getItem('math_firebase_config');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            return {
-                apiKey: parsed.apiKey || '',
-                projectId: parsed.projectId || '',
-                authDomain: parsed.authDomain || '',
-                storageBucket: parsed.storageBucket || '',
-                messagingSenderId: parsed.messagingSenderId || '',
-                appId: parsed.appId || ''
-            };
-        }
-    } catch(e) {}
-    return { apiKey: '', projectId: '', authDomain: '', storageBucket: '', messagingSenderId: '', appId: '' };
-  });
-  const [mode, setMode] = useState<'code' | 'manual'>('code');
-  const [error, setError] = useState(initialError || '');
-  const [showHelp, setShowHelp] = useState(true);
+// Services & Config
+import { subscribeToCollection, saveData, updatePartialData, removeData } from './services/firebaseService';
+import { isUsingDefaultConfig } from './firebaseConfig';
 
-  const handleSave = () => {
-    try {
-      let config: any = {};
-      
-      if (mode === 'code') {
-        const extract = (key: string) => {
-          // Looks for: key followed by optional spaces/colons, then quotes, then captures content, then closing quote
-          const regex = new RegExp(`${key}\\s*[:=]?\\s*["']([^"']+)["']`, 'i');
-          const match = inputStr.match(regex);
-          return match ? match[1] : '';
-        };
-
-        config = {
-          apiKey: extract('apiKey'),
-          authDomain: extract('authDomain'),
-          projectId: extract('projectId'),
-          storageBucket: extract('storageBucket'),
-          messagingSenderId: extract('messagingSenderId'),
-          appId: extract('appId')
-        };
-
-        // Fallback: If regex fails, maybe they pasted raw JSON?
-        if (!config.apiKey && (inputStr.trim().startsWith('{') || inputStr.includes('apiKey'))) {
-           try { 
-             // Try to make it valid JSON if keys aren't quoted
-             const jsonStr = inputStr.replace(/(\w+):/g, '"$1":').replace(/'/g, '"').replace(/,(\s*})/g, '$1'); 
-             const parsed = JSON.parse(jsonStr);
-             config = { ...config, ...parsed };
-           } catch(e) {}
-        }
-
-      } else {
-        config = manualConfig;
-      }
-      
-      if (!config.apiKey || !config.projectId) {
-        throw new Error('لم نستطع استخراج البيانات. تأكد من نسخ الكود كاملاً (الذي يبدأ بـ const firebaseConfig).');
-      }
-      
-      onSave(config);
-    } catch (e: any) {
-      setError(e.message || 'تنسيق البيانات غير صحيح. حاول النسخ مرة أخرى.');
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-right" dir="rtl">
-      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 md:p-10 shadow-2xl space-y-6 animate-slideUp max-h-[90vh] overflow-y-auto no-scrollbar">
-        <div className="text-center">
-           <div className="w-20 h-20 bg-blue-600 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-6 text-white">⚙️</div>
-           <h2 className="text-2xl font-black text-slate-800">إعداد الاتصال بقاعدة البيانات</h2>
-           <p className="text-slate-500 text-sm font-bold mt-2">المنصة جاهزة، فقط نحتاج لربطها بمشروعك على Firebase.</p>
-        </div>
-
-        {error && (
-          <div className="bg-rose-50 border-r-4 border-rose-500 p-4 rounded-xl">
-             <p className="text-rose-600 text-xs font-black flex items-center gap-2">
-               <span>⚠️</span> {error}
-             </p>
-          </div>
-        )}
-        
-        <button 
-          onClick={() => setShowHelp(!showHelp)}
-          className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-indigo-100 transition-all border border-indigo-100"
-        >
-          <span>{showHelp ? 'إخفاء التعليمات' : 'أين أجد الكود؟'}</span>
-          <span>💡</span>
-        </button>
-
-        {showHelp && (
-          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-sm space-y-4 animate-fadeIn">
-             <ol className="list-decimal pr-4 space-y-3 text-slate-600 font-bold text-xs leading-relaxed">
-               <li>اذهب إلى إعدادات مشروعك في Firebase (Project Settings).</li>
-               <li>انزل للأسفل لقسم <strong>Your apps</strong>.</li>
-               <li>انسخ الكود الموجود داخل المربع الرمادي بالكامل.</li>
-               <li>
-                 الكود يبدو هكذا تقريباً:
-                 <div className="mt-2 bg-slate-200 p-2 rounded-lg font-mono text-[9px] text-left" dir="ltr">
-                   const firebaseConfig = &#123;<br/>
-                   &nbsp;&nbsp;apiKey: "AIzaSy...",<br/>
-                   &nbsp;&nbsp;authDomain: "...",<br/>
-                   &nbsp;&nbsp;...<br/>
-                   &#125;;
-                 </div>
-               </li>
-             </ol>
-          </div>
-        )}
-
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-           <button onClick={() => setMode('code')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${mode === 'code' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}>لصق الكود (تلقائي)</button>
-           <button onClick={() => setMode('manual')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${mode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}>إدخال يدوي</button>
-        </div>
-
-        {mode === 'code' ? (
-          <div className="space-y-2">
-             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Firebase Config Code</label>
-             <textarea 
-               className="w-full h-40 bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 font-mono text-[10px] outline-none focus:border-blue-600 text-left text-slate-600" 
-               dir="ltr"
-               placeholder="الصق الكود هنا..."
-               value={inputStr}
-               onChange={e => setInputStr(e.target.value)}
-             />
-          </div>
-        ) : (
-          <div className="space-y-3">
-             <input placeholder="API Key (يبدأ بـ AIza)" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold text-left outline-none border focus:border-blue-600" dir="ltr" value={manualConfig.apiKey} onChange={e => setManualConfig({...manualConfig, apiKey: e.target.value})} />
-             <input placeholder="Project ID" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold text-left outline-none border focus:border-blue-600" dir="ltr" value={manualConfig.projectId} onChange={e => setManualConfig({...manualConfig, projectId: e.target.value})} />
-             <input placeholder="Auth Domain" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold text-left outline-none border focus:border-blue-600" dir="ltr" value={manualConfig.authDomain} onChange={e => setManualConfig({...manualConfig, authDomain: e.target.value})} />
-          </div>
-        )}
-
-        <button onClick={handleSave} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg hover:scale-[1.02] transition-transform">حفظ والاتصال 🚀</button>
-        
-        {/* Safe reset in case of loops */}
-        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-2 text-rose-400 text-[10px] font-bold hover:text-rose-600">
-           إعادة تعيين كاملة (اضغط فقط إذا استمرت المشكلة)
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const initialSettings: PlatformSettings = {
+const INITIAL_SETTINGS: PlatformSettings = {
   teacherName: 'أشرف جميل',
-  platformName: 'منصة المحترف',
-  adminCode: '0000', 
-  studentWelcomeMsg: 'أهلاً بك يا عبقري الرياضيات! استعد للتفوق. 🎓',
-  parentWelcomeMsg: 'نسعد بمتابعتكم لرحلة نجاح أبنائكم. 🤝',
+  platformName: 'MathMaster Pro',
+  adminCode: '1234',
+  studentWelcomeMsg: 'أهلاً بك في منصة التفوق',
+  parentWelcomeMsg: 'تابع مستوى ابنك لحظة بلحظة',
   protectionEnabled: true,
   watermarkEnabled: true,
-  watermarkText: 'Al-Mohtaref Math',
+  watermarkText: 'MathMaster Property',
   portalTheme: 'indigo',
-  portalLayout: 'default',
+  portalLayout: 'modern',
   liveSessionActive: false,
   liveSessionLink: '',
   liveSessionTitle: '',
   allowSelfRegistration: true,
   mathNotation: 'arabic',
-  autoAttendanceEnabled: true,
-  autoParentReportEnabled: true,
+  autoAttendanceEnabled: false,
+  autoParentReportEnabled: false,
   enableChat: true,
   enableLeaderboard: true,
   enableAiSolver: true,
   examMode: false,
   integrityMode: false,
   maxDevicesPerStudent: 2,
-  viewLabels: {
-    [AppView.DASHBOARD]: 'الرئيسية',
-    [AppView.STUDENTS]: 'الطلاب',
-    [AppView.FILES]: 'المحتوى',
-    [AppView.QUIZZES]: 'الاختبارات',
-    [AppView.CHAT]: 'التفاعل',
-    [AppView.CONTROL_PANEL]: 'لوحة التحكم',
-    [AppView.ASSIGNMENTS]: 'الواجبات',
-    [AppView.LIVE_CLASS]: 'البث المباشر'
-  },
-  enabledViews: [AppView.DASHBOARD, AppView.STUDENTS, AppView.FILES, AppView.QUIZZES, AppView.CHAT, AppView.CONTROL_PANEL, AppView.ASSIGNMENTS, AppView.LIVE_CLASS],
-  customSections: [],
   branding: {
-    primaryColor: '#2563eb', // Default Blue
-    secondaryColor: '#f59e0b', // Default Amber
-    logoUrl: '', // Default text icon
-    heroImageUrl: '', // Default abstract
+    primaryColor: '#2563eb',
+    secondaryColor: '#f59e0b',
+    fontFamily: 'Cairo',
+    logoUrl: '',
+    heroImageUrl: '',
+    faviconUrl: ''
   },
   contentTexts: {
     landingTitle: 'بوابة الاحتراف في الرياضيات',
-    landingSubtitle: 'حيث تلتقي التكنولوجيا بعبقرية الأرقام',
-    studentWelcomeTitle: 'مرحباً بك يا بطل',
-    studentWelcomeSubtitle: 'استعد لرحلة التفوق مع منصة المحترف',
-    dashboardTitle: 'لوحة التحكم الشاملة'
+    landingSubtitle: 'المنصة التعليمية الأقوى للمرحلة الثانوية',
+    studentWelcomeTitle: 'مرحباً يا بطل',
+    studentWelcomeSubtitle: 'استعد لرحلة التفوق',
+    dashboardTitle: 'لوحة التحكم'
+  },
+  dashboardWidgets: {
+    showStats: true,
+    showQuickActions: true,
+    showLeaderboard: true,
+    showTools: true
+  },
+  featureConfig: {
+    [AppView.STUDENT_PORTAL]: [
+      { id: 'dashboard', label: 'الرئيسية', enabled: true },
+      { id: 'library', label: 'دروسي', enabled: true },
+      { id: 'assignments', label: 'واجباتي', enabled: true },
+      { id: 'quizzes', label: 'امتحاناتي', enabled: true },
+      { id: 'results', label: 'التقارير', enabled: true }
+    ],
+    [AppView.QUIZZES]: [
+      { id: 'ai', label: 'مولد الأسئلة (AI)', enabled: true },
+      { id: 'scanner', label: 'ماسح الورق', enabled: true },
+      { id: 'editor', label: 'المحرر اليدوي', enabled: true },
+      { id: 'external', label: 'روابط خارجية', enabled: true }
+    ],
+    [AppView.FILES]: [
+      { id: 'videos', label: 'فيديوهات', enabled: true },
+      { id: 'docs', label: 'كتب وملازم', enabled: true }
+    ],
+    [AppView.CALL_CENTER]: [
+      { id: 'inquiries', label: 'الطلبات الواردة', enabled: true },
+      { id: 'logs', label: 'سجل المكالمات', enabled: true }
+    ],
+    [AppView.CHAT]: [
+      { id: 'group', label: 'الساحة العامة', enabled: true },
+      { id: 'private', label: 'مراسلة المعلم', enabled: true }
+    ]
   }
 };
 
 const App: React.FC = () => {
-  const [showConfigScreen, setShowConfigScreen] = useState(isUsingDefaultConfig());
-  const [configError, setConfigError] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<AppView | string>(() => {
-    return (localStorage.getItem('math_currentView') as AppView) || AppView.DASHBOARD;
-  });
+  // --- State Management ---
+  const [currentView, setCurrentView] = useState<AppView | string>(AppView.DASHBOARD);
+  const [currentUser, setCurrentUser] = useState<any>(null); // { role, id, name, ... }
+  const [settings, setSettings] = useState<PlatformSettings>(INITIAL_SETTINGS);
   
-  const [activeControlTab, setActiveControlTab] = useState<string>(() => {
-    return localStorage.getItem('math_activeControlTab') || 'groups';
-  });
-
-  const [loggedUser, setLoggedUser] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem('math_loggedUser');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      console.error("Failed to parse logged user", e);
-      return null;
-    }
-  });
-
-  const [settings, setSettings] = useState<PlatformSettings>(initialSettings);
+  // Data Collections
+  const [students, setStudents] = useState<Student[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [assistants, setAssistants] = useState<Assistant[]>([]);
-  const [results, setResults] = useState<QuizResult[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+  const [results, setResults] = useState<QuizResult[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [videoLessons, setVideoLessons] = useState<VideoLesson[]>([]);
   const [educationalSources, setEducationalSources] = useState<EducationalSource[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [inquiries, setInquiries] = useState<ParentInquiry[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [formulas, setFormulas] = useState<MathFormula[]>([]);
   const [rewards, setRewards] = useState<PlatformReward[]>([]);
-  const [redemptions, setRewardRedemptions] = useState<RewardRedemption[]>([]);
-  
-  const [toasts, setToasts] = useState<any[]>([]);
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [connectionTakingLong, setConnectionTakingLong] = useState(false);
+  const [redemptions, setRedemptions] = useState<RewardRedemption[]>([]);
+  const [videoViews, setVideoViews] = useState<VideoView[]>([]);
 
-  // Connection timeout checker
+  const [toasts, setToasts] = useState<Omit<ToastProps, 'onClose'>[]>([]);
+  const [isDemoMode, setIsDemoMode] = useState(isUsingDefaultConfig());
+
+  // --- Effects ---
   useEffect(() => {
-    if (!isDataLoaded && !showConfigScreen) {
-      const timer = setTimeout(() => {
-        setConnectionTakingLong(true);
-      }, 7000); // 7 seconds timeout
-      return () => clearTimeout(timer);
-    }
-  }, [isDataLoaded, showConfigScreen]);
+    // Load local settings/user if available
+    const savedUser = localStorage.getItem('math_user');
+    if (savedUser) setCurrentUser(JSON.parse(savedUser));
 
-  useEffect(() => {
-    if (showConfigScreen) return; 
+    const savedSettings = localStorage.getItem('math_settings');
+    if (savedSettings) setSettings(JSON.parse(savedSettings));
 
-    const unsubscribes: (() => void)[] = [];
-
-    // Try to connect to settings first
-    const settingsUnsub = subscribeToCollection('settings', (data) => {
-      if (data.length > 0) {
-        const remoteSettings = data.find(d => d.id === 'main_settings') || data[0];
-        setSettings(prev => ({
-          ...initialSettings,
-          ...remoteSettings,
-          branding: { ...initialSettings.branding, ...(remoteSettings.branding || {}) },
-          contentTexts: { ...initialSettings.contentTexts, ...(remoteSettings.contentTexts || {}) }
-        }));
-      } else {
-        // If connected but empty, initialize settings
-        saveData('settings', { ...initialSettings, id: 'main_settings' }).catch(err => {
-           // If save fails here, it's likely permission issue or bad config
-           console.error("Failed to init settings", err);
-        });
+    // Data Loading (Firebase or LocalStorage for Demo)
+    if (!isDemoMode) {
+      // Subscribe to Firebase collections
+      const unsubs = [
+        subscribeToCollection('students', setStudents),
+        subscribeToCollection('years', setYears),
+        subscribeToCollection('groups', setGroups),
+        subscribeToCollection('quizzes', setQuizzes),
+        subscribeToCollection('assignments', setAssignments),
+        subscribeToCollection('submissions', setSubmissions),
+        subscribeToCollection('results', setResults),
+        subscribeToCollection('notifications', setNotifications),
+        subscribeToCollection('videoLessons', setVideoLessons),
+        subscribeToCollection('educationalSources', setEducationalSources),
+        subscribeToCollection('messages', setMessages),
+        subscribeToCollection('assistants', setAssistants),
+        subscribeToCollection('inquiries', setInquiries),
+        subscribeToCollection('callLogs', setCallLogs),
+        subscribeToCollection('schedules', setSchedules),
+        subscribeToCollection('formulas', setFormulas),
+        subscribeToCollection('rewards', setRewards),
+        subscribeToCollection('redemptions', setRedemptions),
+        subscribeToCollection('settings', (data) => { if(data[0]) setSettings(data[0] as PlatformSettings); })
+      ];
+      return () => unsubs.forEach(unsub => unsub());
+    } else {
+      // Initialize Mock Data for Demo Mode so login works immediately
+      if (students.length === 0) {
+        const mockStudent: Student = {
+          id: 's_demo_1',
+          name: 'طالب تجريبي',
+          studentCode: 'M3-123',
+          studentPhone: '01000000000',
+          parentPhone: '01100000000',
+          yearId: 'y1',
+          groupId: 'g1',
+          attendance: false,
+          score: 85,
+          points: 150,
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmed',
+          scoreHistory: [80, 85, 90],
+          status: 'active',
+          badges: [],
+          streaks: 5,
+          deviceIds: []
+        };
+        setStudents([mockStudent]);
       }
-      setIsDataLoaded(true);
-    }, (error) => {
-      console.error("Firebase Connection Error:", error);
       
-      // Handle known errors - DO NOT reset config automatically on transient errors
-      if (error.code === 'permission-denied') {
-         setConfigError("اتصال مرفوض. تأكد من تفعيل Firestore في مشروعك.");
-         setShowConfigScreen(true);
-      } else if (error.code === 'unavailable' || (error.message && error.message.includes('project-id'))) {
-         setConfigError("خطأ في الاتصال أو إعدادات المشروع (ID/Network).");
-         // Do not resetConfig() here to avoid loop if it's just network
-         setShowConfigScreen(true);
-      } else if (error.code === 'unimplemented' || error.message.includes('Firestore')) {
-         setConfigError("لم يتم تفعيل قاعدة البيانات (Firestore) في المشروع.");
-         setShowConfigScreen(true);
-      } else {
-         // Generic connection error, maybe offline
-         if (!isDataLoaded) setConnectionTakingLong(true);
+      if (years.length === 0) {
+        setYears([{ id: 'y1', name: 'الصف الثالث الثانوي' }]);
       }
-    });
 
-    unsubscribes.push(settingsUnsub);
-
-    if (!showConfigScreen) {
-        // Only try other collections if settings connected (or attempting to)
-        unsubscribes.push(subscribeToCollection('years', setYears));
-        unsubscribes.push(subscribeToCollection('groups', setGroups));
-        unsubscribes.push(subscribeToCollection('students', setStudents));
-        unsubscribes.push(subscribeToCollection('assistants', setAssistants));
-        unsubscribes.push(subscribeToCollection('results', setResults));
-        unsubscribes.push(subscribeToCollection('assignments', setAssignments));
-        unsubscribes.push(subscribeToCollection('submissions', setSubmissions));
-        unsubscribes.push(subscribeToCollection('notifications', setNotifications));
-        unsubscribes.push(subscribeToCollection('quizzes', setQuizzes));
-        unsubscribes.push(subscribeToCollection('videoLessons', setVideoLessons));
-        unsubscribes.push(subscribeToCollection('chatMessages', (data) => setChatMessages(data.sort((a,b) => parseInt(a.id.substr(1)) - parseInt(b.id.substr(1))))));
-        unsubscribes.push(subscribeToCollection('educationalSources', setEducationalSources));
-        unsubscribes.push(subscribeToCollection('inquiries', setInquiries));
-        unsubscribes.push(subscribeToCollection('callLogs', setCallLogs));
-        unsubscribes.push(subscribeToCollection('schedules', setSchedules));
-        unsubscribes.push(subscribeToCollection('formulas', setFormulas));
-        unsubscribes.push(subscribeToCollection('rewards', setRewards));
-        unsubscribes.push(subscribeToCollection('redemptions', setRewardRedemptions));
+      if (groups.length === 0) {
+        setGroups([{ id: 'g1', name: 'مجموعة التميز (أ)', yearId: 'y1', time: 'السبت 10 ص', joinCode: 'G1', type: 'center', gender: 'mixed' }]);
+      }
     }
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-    };
-  }, [showConfigScreen]);
+  }, [isDemoMode]);
 
   useEffect(() => {
-    localStorage.setItem('math_currentView', currentView);
-    localStorage.setItem('math_activeControlTab', activeControlTab);
-    
-    try {
-      localStorage.setItem('math_loggedUser', JSON.stringify(loggedUser));
-    } catch (e) {
-      console.error("Failed to save loggedUser to localStorage", e);
-      // Attempt to save minimal info to avoid crash
-      if (loggedUser && loggedUser.id) {
-         try {
-           localStorage.setItem('math_loggedUser', JSON.stringify({ id: loggedUser.id, role: loggedUser.role, name: loggedUser.name }));
-         } catch (e2) {}
-      }
+    if (isDemoMode) {
+      localStorage.setItem('math_settings', JSON.stringify(settings));
+    } else if (currentUser?.role === 'teacher') {
+      saveData('settings', { ...settings, id: 'global_settings' });
     }
-  }, [currentView, activeControlTab, loggedUser]);
+  }, [settings, isDemoMode, currentUser]);
 
-  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
+  // --- Handlers ---
+  const addToast = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const handleUpdateSettings = (newSettings: PlatformSettings) => {
-    saveData('settings', { ...newSettings, id: 'main_settings' });
   };
 
-  const sendPushNotification = useCallback(async (title: string, body: string) => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted' && navigator.serviceWorker) {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        reg.showNotification(title, {
-          body: body,
-          icon: settings.branding.logoUrl || 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png',
-          dir: 'rtl',
-          lang: 'ar'
-        } as any);
-      } catch (e) { console.error(e); }
-    }
-  }, [settings.branding.logoUrl]);
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
-  const handleAdminLogin = (code: string) => {
-    if (code === settings.adminCode) {
-      setLoggedUser({ id: 'teacher', name: settings.teacherName, role: 'teacher' });
-      addToast(`مرحباً بك يا أستاذ ${settings.teacherName.split(' ')[0]}! ✨`, 'success');
-      return;
+  const handleUnifiedLogin = (role: 'student' | 'teacher' | 'parent', code: string) => {
+    const cleanCode = code.trim();
+    
+    if (role === 'teacher') {
+      if (cleanCode === settings.adminCode) {
+        const teacherUser = { id: 'teacher', name: settings.teacherName, role: 'teacher' };
+        setCurrentUser(teacherUser);
+        localStorage.setItem('math_user', JSON.stringify(teacherUser));
+        addToast('تم تسجيل دخول المعلم بنجاح', 'success');
+      } else {
+        const assistant = assistants.find(a => a.code === cleanCode);
+        if (assistant) {
+          const asstUser = { ...assistant, role: 'assistant' };
+          setCurrentUser(asstUser);
+          localStorage.setItem('math_user', JSON.stringify(asstUser));
+          addToast(`مرحباً ${assistant.name}`, 'success');
+        } else {
+          addToast('كود المعلم غير صحيح', 'error');
+        }
+      }
+    } else if (role === 'student') {
+      if (cleanCode === 'guest' || cleanCode === 'guest_login') {
+        const guestUser = { id: 'guest', name: 'زائر', role: 'student', yearId: years[0]?.id || 'y1' };
+        setCurrentUser(guestUser);
+        return;
+      }
+      
+      const student = students.find(s => s.studentCode === cleanCode);
+      if (student) {
+        const studentUser = { ...student, role: 'student' };
+        setCurrentUser(studentUser);
+        localStorage.setItem('math_user', JSON.stringify(studentUser));
+        addToast('تم تسجيل الدخول بنجاح', 'success');
+      } else {
+        addToast(`كود الطالب "${cleanCode}" غير موجود`, 'error');
+      }
+    } else if (role === 'parent') {
+      const student = students.find(s => s.parentPhone === cleanCode);
+      if (student) {
+        const parentUser = { ...student, role: 'parent' };
+        setCurrentUser(parentUser);
+        localStorage.setItem('math_user', JSON.stringify(parentUser));
+        addToast('تم تسجيل دخول ولي الأمر', 'success');
+      } else {
+        addToast('رقم الهاتف غير مسجل في النظام', 'error');
+      }
     }
-    const assistant = assistants.find(a => a.code === code);
-    if (assistant) {
-      setLoggedUser({ ...assistant, role: 'assistant' });
-      addToast(`مرحباً بك يا ${assistant.name.split(' ')[0]}! 🛠️`, 'success');
-      return;
-    }
-    addToast('الكود غير صحيح', 'error');
   };
 
   const handleLogout = () => {
-    setLoggedUser(null);
+    setCurrentUser(null);
+    localStorage.removeItem('math_user');
     setCurrentView(AppView.DASHBOARD);
-    localStorage.removeItem('math_loggedUser');
   };
 
-  const handleNavigate = (view: AppView | string) => {
-    const isAssistant = loggedUser?.role === 'assistant';
-    const permissions = isAssistant ? (loggedUser as Assistant).permissions : Object.values(AppView);
-    if (isAssistant && !permissions.includes(view as AppView) && view !== AppView.DASHBOARD) {
-      addToast('عذراً، لا تمتلك صلاحية الوصول لهذا القسم.', 'error');
-      return;
-    }
-    const controlTabMapping: Record<string, string> = {
-      [AppView.RESULTS]: 'results', [AppView.MANAGEMENT]: 'groups', [AppView.REWARDS]: 'store',
-      [AppView.SETTINGS]: 'settings', [AppView.TEST_CENTER]: 'tech', [AppView.NOTIFICATIONS]: 'comms',
-      [AppView.CALL_CENTER]: 'comms', [AppView.SCHEDULE]: 'groups', [AppView.LEADERBOARD]: 'comms', [AppView.SECTIONS]: 'sections'
-    };
-    if (controlTabMapping[view]) {
-      setActiveControlTab(controlTabMapping[view]);
-      setCurrentView(AppView.CONTROL_PANEL);
+  // Helper to persist data based on mode
+  const persistData = async (collection: string, data: any, action: 'save' | 'update' | 'delete' = 'save') => {
+    if (isDemoMode) {
+      switch(collection) {
+        case 'students': 
+          if(action==='save') setStudents(prev => [...prev, data]); 
+          if(action==='update') setStudents(prev => prev.map(s => s.id === data.id ? {...s, ...data} : s));
+          if(action==='delete') setStudents(prev => prev.filter(s => s.id !== data));
+          break;
+        case 'assignments':
+          if(action==='save') setAssignments(prev => [...prev, data]);
+          if(action==='update') setAssignments(prev => prev.map(a => a.id === data.id ? {...a, ...data} : a));
+          if(action==='delete') setAssignments(prev => prev.filter(a => a.id !== data));
+          break;
+        case 'quizzes':
+          if(action==='save') setQuizzes(prev => [...prev, data]);
+          break;
+        case 'videoViews':
+          if(action==='save') setVideoViews(prev => [...prev, data]);
+          if(action==='update') setVideoViews(prev => prev.map(v => v.id === data.id ? {...v, ...data} : v));
+          break;
+      }
     } else {
-      setCurrentView(view);
+      try {
+        if (action === 'save') await saveData(collection, data);
+        if (action === 'update') await updatePartialData(collection, data.id, data);
+        if (action === 'delete') await removeData(collection, data);
+      } catch (e) {
+        if (collection !== 'videoViews') {
+           addToast('حدث خطأ في حفظ البيانات', 'error');
+        }
+      }
     }
   };
 
-  const handleAttendanceChange = (id: string) => {
-    const student = students.find(s => s.id === id);
-    if (student) {
-      const newAttendance = !student.attendance;
-      updatePartialData('students', id, { 
-        attendance: newAttendance,
-        points: (student.points || 0) + (newAttendance ? 5 : 0)
-      });
+  const handleVideoProgress = (videoId: string, percent: number) => {
+    if (!currentUser || currentUser.role !== 'student') return;
+    const existingView = videoViews.find(v => v.studentId === currentUser.id && v.videoId === videoId);
+    if (existingView) {
+      if (percent > existingView.watchedPercent) {
+        const updatedView = { ...existingView, watchedPercent: percent, lastWatched: new Date().toISOString() };
+        persistData('videoViews', updatedView, 'update');
+        setVideoViews(prev => prev.map(v => v.id === existingView.id ? updatedView : v));
+      }
+    } else {
+      const newView: VideoView = {
+        id: 'view_' + Date.now(),
+        studentId: currentUser.id,
+        videoId: videoId,
+        watchedPercent: percent,
+        lastWatched: new Date().toISOString()
+      };
+      persistData('videoViews', newView, 'save');
+      setVideoViews(prev => [...prev, newView]);
     }
   };
 
-  const handleSelfRegistration = (newStudent: any) => {
-    const studentData: Student = {
-      ...newStudent,
-      id: 's' + Date.now(),
-      points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [], isPaid: false
-    };
-    saveData('students', studentData);
-    addToast('تم إرسال طلب تسجيلك بنجاح!', 'success');
-    setCurrentView(AppView.DASHBOARD);
-  };
+  const fontStyle = { fontFamily: settings.branding.fontFamily || 'Cairo' };
 
-  const renderTeacherView = () => {
-    const customSection = settings.customSections?.find(s => s.id === currentView);
-    if (customSection) {
+  if (!currentUser) {
+    if (currentView === AppView.REGISTRATION) {
       return (
-        <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 animate-fadeIn text-right" dir="rtl">
-          <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-4">
-            <span className="text-4xl">{customSection.icon}</span>
-            {customSection.title}
-          </h2>
-          <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-             <MathRenderer content={customSection.content} />
-          </div>
+        <div style={fontStyle}>
+          <Registration 
+            years={years} 
+            groups={groups} 
+            onRegister={(data) => {
+              const newStudent = { ...data, id: 's' + Date.now(), points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [] };
+              persistData('students', newStudent, 'save');
+              addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
+              handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
+            }}
+            onBack={() => setCurrentView(AppView.DASHBOARD)}
+            teacherName={settings.teacherName}
+          />
+          <InstallPWA />
         </div>
       );
     }
-
-    switch (currentView) {
-      case AppView.DASHBOARD: 
-        return <Dashboard teacherName={settings.teacherName} settings={settings} students={students} quizzes={quizzes} assignments={assignments} submissions={submissions} onNavigate={handleNavigate} loggedUser={loggedUser} isConnected={isDataLoaded} />;
-      
-      case AppView.STUDENTS: 
-        return <StudentList 
-          students={students} groups={groups} years={years} notifications={notifications} 
-          onAttendanceChange={handleAttendanceChange} onSendAlert={() => {}} 
-          onDeleteStudent={(id) => removeData('students', id)} 
-          onResetDevice={(id) => updatePartialData('students', id, { deviceIds: [] })} 
-          onAddStudent={(s) => { saveData('students', s); addToast('تم الإضافة بنجاح', 'success'); }} 
-          onUpdateStudent={(id, u) => updatePartialData('students', id, u)}
-          teacherName={settings.teacherName} 
-        />;
-
-      case AppView.FILES:
-        return (
-          <div className="space-y-12">
-            <FilesView 
-              years={years} videoLessons={videoLessons} educationalSources={educationalSources} students={students} videoViews={[]} 
-              onAddVideo={(v) => saveData('videoLessons', {...v, id: 'vid'+Date.now()})} 
-              onDeleteVideo={(id) => removeData('videoLessons', id)} 
-              onAddSource={(s) => saveData('educationalSources', s)} 
-              onDeleteSource={(id) => removeData('educationalSources', id)} 
-            />
-            <div className="border-t border-slate-100 pt-12">
-               <Formulas years={years} formulas={formulas} onAdd={(f) => saveData('formulas', {...f, id: 'frm'+Date.now()})} onDelete={(id) => removeData('formulas', id)} />
-            </div>
-          </div>
-        );
-
-      case AppView.ASSIGNMENTS:
-        return (
-          <AssignmentsView 
-            assignments={assignments} submissions={submissions} students={students} years={years} teacherName={settings.teacherName} notation={settings.mathNotation} 
-            onAdd={(a) => {
-              saveData('assignments', a);
-              if (a.status === 'active') sendPushNotification('واجب جديد', a.title);
-            }} 
-            onUpdate={(a) => { saveData('assignments', a); addToast('تم التحديث', 'success'); }}
-            onDelete={(id) => removeData('assignments', id)} 
-            onGrade={(sid, grade, feedback, correctedImg) => { 
-              updatePartialData('submissions', sid, { grade, feedback, fileUrl: correctedImg || undefined, status: 'graded' });
-              addToast('تم التصحيح', 'success'); 
-            }} 
-          />
-        );
-
-      case AppView.QUIZZES:
-        return (
-          <QuizGenerator 
-            years={years} sources={educationalSources} notation={settings.mathNotation} 
-            onPublish={(title, yId, qs) => { 
-              saveData('quizzes', {id: 'q'+Date.now(), title, yearId: yId, date: new Date().toLocaleDateString('ar-EG'), type: 'native', questions: qs});
-              sendPushNotification('اختبار جديد', title);
-              addToast('تم النشر', 'success'); 
-            }} 
-          />
-        );
-
-      case AppView.LIVE_CLASS:
-        return (
-           <LiveClass 
-            teacherName={settings.teacherName} settings={settings} 
-            onUpdateSettings={handleUpdateSettings} onBroadcastToWhatsApp={() => addToast('تم التنبيه', 'info')} 
-            onPostSummary={(src) => saveData('educationalSources', src)} 
-          />
-        );
-
-      case AppView.CHAT:
-        return (
-          <div className="space-y-12">
-            <ChatRoom 
-              user={{id: loggedUser?.id || 'admin', name: loggedUser?.name || 'Admin', role: loggedUser?.role || 'teacher'}} 
-              messages={chatMessages} years={years} students={students} 
-              onSendMessage={(text, type, rid, audio) => saveData('chatMessages', {id: 'm'+Date.now(), senderId: loggedUser?.id || 'admin', senderName: loggedUser?.name || 'Admin', senderRole: loggedUser?.role || 'teacher', text, timestamp: new Date().toLocaleTimeString('ar-EG'), type, recipientId: rid, audioData: audio, yearId: 'all'})} 
-              notation={settings.mathNotation} 
-            />
-            <div className="border-t border-slate-100 pt-12">
-               <AISolver notation={settings.mathNotation} />
-            </div>
-          </div>
-        );
-
-      case AppView.SECTIONS:
-        return <Sections sections={settings.customSections || []} onUpdateSections={(secs) => handleUpdateSettings({...settings, customSections: secs})} />;
-
-      case AppView.STUDENT_PORTAL:
-        const mockStudent: Student = {
-          id: 'preview', studentCode: 'PREVIEW', name: 'معاينة المعلم', studentPhone: '', parentPhone: '', yearId: years[0]?.id, groupId: groups[0]?.id,
-          attendance: true, score: 100, points: 500, avatar: settings.branding.heroImageUrl || '', scoreHistory: [], status: 'active', badges: [], streaks: 5, deviceIds: []
-        };
-        return (
-          <div className="relative">
-            <div className="fixed bottom-4 left-4 z-[1000]">
-               <button onClick={() => setCurrentView(AppView.DASHBOARD)} className="bg-rose-600 text-white px-6 py-3 rounded-full font-black shadow-xl">إنهاء المعاينة</button>
-            </div>
-            <StudentPortal 
-              student={mockStudent} assignments={assignments} submissions={submissions} quizzes={quizzes} results={results} settings={settings} videoLessons={videoLessons} notifications={notifications} groups={groups} educationalSources={educationalSources} schedules={schedules} formulas={formulas} rewards={rewards} redemptions={redemptions} 
-              onQuizSubmit={()=>{}} onAssignmentSubmit={()=>{}} onSendMessage={()=>{}} 
-              onMarkNotificationRead={(id) => {}} 
-              onRedeemReward={()=>{}} onSpinWin={()=>{}} messages={chatMessages} years={years} students={students} onBack={() => setCurrentView(AppView.DASHBOARD)} onLogin={()=>{}}
-              onUpdateStudent={()=>{}}
-            />
-          </div>
-        );
-
-      case AppView.CONTROL_PANEL:
-        return (
-          <AdminControlPanel 
-            activeTab={activeControlTab} onTabChange={setActiveControlTab}
-            years={years} groups={groups} students={students} notifications={notifications} results={results} settings={settings} assistants={assistants} inquiries={inquiries} callLogs={callLogs} schedules={schedules} rewards={rewards} redemptions={redemptions} quizzes={quizzes} assignments={assignments}
-            onUpdateSettings={handleUpdateSettings} 
-            onAddAssistant={(a) => saveData('assistants', a)}
-            onDeleteAssistant={(id) => removeData('assistants', id)}
-            onAddYear={(n) => saveData('years', {id: 'y'+Date.now(), name: n})}
-            onAddGroup={(n, y, t, ty, g, c, p) => saveData('groups', {id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p, joinCode: (p||'GRP')+Math.random().toString(36).substr(2,3).toUpperCase()})}
-            onDeleteGroup={(id) => removeData('groups', id)}
-            onUpdateInquiry={(id, status) => updatePartialData('inquiries', id, { status })}
-            onAddCallLog={(log) => saveData('callLogs', {...log, id: 'log'+Date.now()})}
-            onSendNotif={(n, p) => { saveData('notifications', {...n, id: 'nt'+Date.now(), timestamp: new Date().toLocaleTimeString('ar-EG'), isRead: false}); if(p) sendPushNotification(n.title, n.message); }}
-            onDeleteNotif={(id) => removeData('notifications', id)}
-            onMarkNotifRead={(id) => updatePartialData('notifications', id, { isRead: true })}
-            onUpdateResult={(id, score) => updatePartialData('results', id, { score, status: 'graded' })}
-            onAddReward={(r) => saveData('rewards', {...r, id: 'r'+Date.now()})}
-            onDeleteReward={(id) => removeData('rewards', id)}
-            onMarkRewardDelivered={(id) => updatePartialData('redemptions', id, { status: 'delivered' })}
-            onAddSchedule={(s) => saveData('schedules', {...s, id: 'sch'+Date.now()})}
-            onDeleteSchedule={(id) => removeData('schedules', id)}
-            onMockData={(data) => {
-               data.years.forEach(y => saveData('years', y));
-               data.groups.forEach(g => saveData('groups', g));
-               data.students.forEach(s => saveData('students', s));
-               data.quizzes.forEach(q => saveData('quizzes', q));
-               data.assignments.forEach(a => saveData('assignments', a));
-            }}
-            onEnterSimulation={(s) => setLoggedUser({...s, role: 'student'})}
-            addToast={addToast} loggedUser={loggedUser}
-          />
-        );
-      
-      default: return <Dashboard teacherName={settings.teacherName} settings={settings} students={students} quizzes={quizzes} assignments={assignments} submissions={submissions} onNavigate={handleNavigate} />;
-    }
-  };
-
-  if (showConfigScreen) return <ConfigScreen onSave={saveConfig} initialError={configError} />;
-
-  if (!isDataLoaded) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center text-white font-['Cairo']">
-         <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-6"></div>
-         <h2 className="text-xl font-black mb-2 animate-pulse">جاري الاتصال بقاعدة البيانات...</h2>
-         {connectionTakingLong && (
-           <div className="mt-8 animate-fadeIn max-w-sm space-y-4">
-              <p className="text-slate-400 text-sm font-medium">يبدو أن هناك مشكلة في الاتصال أو الإعدادات.</p>
-              <button 
-                onClick={() => { resetConfig(); setShowConfigScreen(true); }}
-                className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all"
-              >
-                إعادة ضبط الإعدادات ⚙️
-              </button>
-           </div>
-         )}
+      <div style={fontStyle}>
+        <LandingPage 
+          teacherName={settings.teacherName} 
+          platformName={settings.platformName}
+          settings={settings}
+          onUnifiedLogin={handleUnifiedLogin} 
+          onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} 
+        />
+        <InstallPWA />
       </div>
     );
   }
 
-  if (!loggedUser) {
-    if (currentView === AppView.REGISTRATION) {
-      return <Registration years={years} groups={groups} onRegister={handleSelfRegistration} onBack={() => setCurrentView(AppView.DASHBOARD)} teacherName={settings.teacherName} />;
-    }
+  if (currentUser.role === 'student') {
     return (
-      <>
-        <InstallPWA />
-        <LandingPage teacherName={settings.teacherName} platformName={settings.platformName} settings={settings} onStudentEntry={() => setLoggedUser({id:'guest', role:'student'})} onTeacherEntry={handleAdminLogin} onParentEntry={() => setLoggedUser({id:'parent_guest', role:'parent'})} onAssistantEntry={handleAdminLogin} onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} />
-      </>
-    );
-  }
-
-  if (loggedUser.role === 'student' && loggedUser.id !== 'guest') {
-    return (
-      <>
-        <InstallPWA />
+      <div style={fontStyle}>
         <StudentPortal 
-          student={students.find(s => s.id === loggedUser.id) || loggedUser} 
-          assignments={assignments} submissions={submissions} quizzes={quizzes} results={results} settings={settings} videoLessons={videoLessons} notifications={notifications} groups={groups} educationalSources={educationalSources} schedules={schedules} formulas={formulas} rewards={rewards} redemptions={redemptions} 
-          onQuizSubmit={(r) => saveData('results', r)} 
-          onAssignmentSubmit={(s) => saveData('submissions', { ...s, id: 'sub' + Date.now(), status: 'pending' })} 
-          onSendMessage={(t, ty, rid, audio) => saveData('chatMessages', {id: 'm'+Date.now(), senderId: loggedUser.id, senderName: loggedUser.name, senderRole: 'student', text: t, timestamp: new Date().toLocaleTimeString('ar-EG'), type: ty, recipientId: rid, audioData: audio, yearId: loggedUser.yearId})} 
-          onMarkNotificationRead={(id) => { 
-             if (loggedUser.id) {
-               updatePartialData('students', loggedUser.id, { lastReadNotificationId: id });
-             }
-          }} 
-          onRedeemReward={(rid) => {
-             const reward = rewards.find(r => r.id === rid);
-             const currentPoints = students.find(s => s.id === loggedUser.id)?.points || 0;
-             if (reward && currentPoints >= reward.cost) {
-                saveData('redemptions', {id: 'red'+Date.now(), studentId: loggedUser.id, studentName: loggedUser.name, rewardId: rid, rewardTitle: reward.title, status: 'pending', timestamp: new Date().toLocaleDateString('ar-EG')});
-                updatePartialData('students', loggedUser.id, { points: currentPoints - reward.cost });
-                addToast('تم استبدال الجائزة!', 'success');
-             }
-          }} 
-          onSpinWin={(p) => {
-             const s = students.find(x => x.id === loggedUser.id);
-             if(s) updatePartialData('students', s.id, { points: (s.points || 0) + p, lastSpinDate: new Date().toISOString() });
+          student={currentUser}
+          assignments={assignments}
+          submissions={submissions}
+          quizzes={quizzes}
+          results={results}
+          settings={settings}
+          videoLessons={videoLessons}
+          notifications={notifications}
+          groups={groups}
+          educationalSources={educationalSources}
+          schedules={schedules}
+          formulas={formulas}
+          rewards={rewards}
+          redemptions={redemptions}
+          messages={messages}
+          years={years}
+          students={students}
+          onQuizSubmit={(res) => persistData('results', res, 'save')}
+          onAssignmentSubmit={(sub) => persistData('submissions', { ...sub, id: 'sub' + Date.now(), status: 'pending' }, 'save')}
+          onLogin={() => {}} 
+          onSendMessage={(text, type, recipientId, audioData) => {
+            const msg = { 
+              id: 'msg' + Date.now(), 
+              text, type, recipientId, audioData, 
+              senderId: currentUser.id, 
+              senderName: currentUser.name, 
+              senderRole: 'student', 
+              timestamp: new Date().toLocaleTimeString('ar-EG'),
+              yearId: currentUser.yearId 
+            };
+            persistData('messages', msg, 'save');
           }}
-          onUpdateStudent={(updates) => updatePartialData('students', loggedUser.id, updates)}
-          messages={chatMessages} years={years} students={students} onBack={handleLogout} 
-          onLogin={(code) => {
-            const student = students.find(st => st.studentCode === code);
-            if (!student) { addToast('الكود غير صحيح', 'error'); return; }
-            
-            let deviceId = localStorage.getItem('math_device_id');
-            if (!deviceId) { deviceId = 'dev_' + Date.now(); localStorage.setItem('math_device_id', deviceId); }
-            
-            const registered = student.deviceIds || [];
-            if (registered.includes(deviceId) || registered.length < settings.maxDevicesPerStudent) {
-               if(!registered.includes(deviceId)) updatePartialData('students', student.id, { deviceIds: [...registered, deviceId] });
-               setLoggedUser({...student, role: 'student'});
-            } else {
-               addToast('تجاوزت عدد الأجهزة المسموح به', 'error');
+          onMarkNotificationRead={(id) => { }}
+          onRedeemReward={(rId) => {
+            const reward = rewards.find(r => r.id === rId);
+            if (reward && currentUser.points >= reward.cost) {
+              persistData('redemptions', { 
+                id: 'red' + Date.now(), 
+                studentId: currentUser.id, 
+                studentName: currentUser.name, 
+                rewardId: reward.id, 
+                rewardTitle: reward.title, 
+                status: 'pending', 
+                timestamp: new Date().toLocaleDateString('ar-EG') 
+              }, 'save');
+              const newPoints = currentUser.points - reward.cost;
+              persistData('students', { id: currentUser.id, points: newPoints }, 'update');
+              setCurrentUser({ ...currentUser, points: newPoints });
+              addToast('تم طلب الجائزة بنجاح', 'success');
             }
           }}
+          onSpinWin={(points) => {
+            const newPoints = (currentUser.points || 0) + points;
+            persistData('students', { id: currentUser.id, points: newPoints, lastSpinDate: new Date().toISOString() }, 'update');
+            setCurrentUser({ ...currentUser, points: newPoints, lastSpinDate: new Date().toISOString() });
+            addToast(`مبروك! ربحت ${points} نقطة`, 'success');
+          }}
+          onUpdateStudent={(updates) => {
+            persistData('students', { id: currentUser.id, ...updates }, 'update');
+            setCurrentUser({ ...currentUser, ...updates });
+          }}
+          onRateSource={(srcId, rating) => {
+            const source = educationalSources.find(s => s.id === srcId);
+            if(source) {
+              const newRatings = [...(source.ratings || []).filter(r => r.studentId !== currentUser.id), { studentId: currentUser.id, value: rating }];
+              persistData('educationalSources', { id: srcId, ratings: newRatings }, 'update');
+            }
+          }}
+          onVideoProgress={handleVideoProgress}
+          onBack={handleLogout}
         />
-      </>
+        <InstallPWA />
+      </div>
     );
   }
 
-  if (loggedUser.role === 'parent' || (loggedUser.id === 'parent_guest' && loggedUser.role === 'parent')) {
-     return (
-       <>
-         <InstallPWA />
-         <ParentPortal 
-            student={students.find(s => s.studentPhone === loggedUser.id) || null} 
-            results={results} settings={settings} onBack={handleLogout}
-            onLogin={(phone) => {
-               const s = students.find(st => st.parentPhone === phone || st.studentPhone === phone);
-               if (s) setLoggedUser({id: s.studentPhone, role: 'parent'});
-               else addToast('رقم غير مسجل', 'error');
-            }}
-            onSendInquiry={(inq) => { saveData('inquiries', inq); addToast('تم الإرسال', 'success'); }}
-         />
-       </>
-     );
+  if (currentUser.role === 'parent') {
+    return (
+      <div style={fontStyle}>
+        <ParentPortal 
+          student={currentUser} 
+          results={results} 
+          onLogin={() => {}} 
+          settings={settings}
+          onSendInquiry={(inq) => { persistData('inquiries', inq, 'save'); addToast('تم إرسال الطلب', 'success'); }}
+          onBack={handleLogout}
+        />
+        <InstallPWA />
+      </div>
+    );
   }
 
+  const renderTeacherContent = () => {
+    switch (currentView) {
+      case AppView.DASHBOARD:
+        return (
+          <Dashboard 
+            teacherName={currentUser.name} 
+            platformName={settings.platformName}
+            students={students}
+            quizzes={quizzes}
+            assignments={assignments}
+            submissions={submissions}
+            settings={settings}
+            onNavigate={setCurrentView}
+            loggedUser={currentUser}
+            isConnected={!isDemoMode}
+            onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }}
+          />
+        );
+      case AppView.STUDENT_PORTAL:
+        const mockStudentForTeacher: Student = {
+           id: 'teacher-view',
+           name: currentUser.name,
+           studentCode: 'TEACHER',
+           studentPhone: '0000000000',
+           parentPhone: '0000000000',
+           yearId: years[0]?.id || 'y1',
+           groupId: groups[0]?.id || 'g1',
+           attendance: true,
+           score: 95,
+           points: 4500,
+           avatar: settings.branding.heroImageUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Teacher',
+           scoreHistory: [80, 90, 95],
+           status: 'active',
+           badges: [],
+           streaks: 10,
+           deviceIds: []
+        };
+        return (
+          <StudentPortal 
+            student={mockStudentForTeacher}
+            assignments={assignments}
+            submissions={[]}
+            quizzes={quizzes}
+            results={[]}
+            settings={settings}
+            videoLessons={videoLessons}
+            notifications={notifications}
+            groups={groups}
+            educationalSources={educationalSources}
+            schedules={schedules}
+            formulas={formulas}
+            rewards={rewards}
+            redemptions={[]}
+            messages={[]}
+            years={years}
+            students={students}
+            onQuizSubmit={()=>{}}
+            onAssignmentSubmit={()=>{}}
+            onLogin={()=>{}}
+            onSendMessage={()=>{}}
+            onMarkNotificationRead={()=>{}}
+            onRedeemReward={()=>{}}
+            onSpinWin={()=>{}}
+            onUpdateStudent={()=>{}}
+            onRateSource={()=>{}}
+            onBack={() => setCurrentView(AppView.DASHBOARD)}
+          />
+        );
+      case AppView.STUDENTS:
+        return (
+          <StudentList 
+            students={students} groups={groups} years={years} notifications={notifications}
+            teacherName={currentUser.name}
+            onAttendanceChange={(id) => {
+              const s = students.find(x => x.id === id);
+              if (s) persistData('students', { id, attendance: !s.attendance }, 'update');
+            }}
+            onSendAlert={(s, m, c) => addToast(`تم إرسال تنبيه لـ ${s.name}`, 'info')}
+            onDeleteStudent={(id) => { if(window.confirm('حذف الطالب؟')) persistData('students', id, 'delete'); }}
+            onResetDevice={(id) => persistData('students', { id, deviceIds: [] }, 'update')}
+            onAddStudent={(s) => { persistData('students', s, 'save'); addToast('تمت الإضافة', 'success'); }}
+            onUpdateStudent={(id, updates) => persistData('students', { id, ...updates }, 'update')}
+          />
+        );
+      case AppView.ASSIGNMENTS:
+        return (
+          <AssignmentsView 
+            assignments={assignments} submissions={submissions} students={students} years={years}
+            teacherName={currentUser.name} notation={settings.mathNotation}
+            onAdd={(a) => { persistData('assignments', a, 'save'); addToast('تم إضافة الواجب', 'success'); }}
+            onUpdate={(a) => { persistData('assignments', a, 'update'); addToast('تم تحديث الواجب', 'success'); }}
+            onDelete={(id) => { if(window.confirm('حذف الواجب؟')) persistData('assignments', id, 'delete'); }}
+            onGrade={(subId, grade, feedback, img) => {
+              persistData('submissions', { id: subId, grade, feedback, status: 'graded', fileUrl: img }, 'update');
+              addToast('تم رصد الدرجة', 'success');
+            }}
+          />
+        );
+      case AppView.QUIZZES:
+        return (
+          <QuizGenerator 
+            years={years} sources={educationalSources} notation={settings.mathNotation}
+            settings={settings}
+            onPublish={(title, yearId, qs, type, link, file) => {
+              const newQuiz: Quiz = { id: 'qz'+Date.now(), title, yearId, date: new Date().toLocaleDateString('ar-EG'), type, questions: qs || [] };
+              persistData('quizzes', newQuiz, 'save');
+              addToast('تم نشر الاختبار', 'success');
+              setCurrentView(AppView.DASHBOARD);
+            }}
+          />
+        );
+      case AppView.LIVE_CLASS:
+        return (
+           <LiveClass 
+            teacherName={settings.teacherName} settings={settings} 
+            educationalSources={educationalSources}
+            onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }} 
+            onBroadcastToWhatsApp={() => addToast('تم التنبيه', 'info')} 
+            onPostSummary={(src) => { persistData('educationalSources', src, 'save'); addToast('تم النشر', 'success'); }} 
+          />
+        );
+      case AppView.FILES:
+        return (
+          <FilesView 
+            years={years} videoLessons={videoLessons} educationalSources={educationalSources} students={students} videoViews={videoViews}
+            onAddVideo={(v) => { persistData('videoLessons', { ...v, id: 'vid'+Date.now() }, 'save'); addToast('تمت الإضافة', 'success'); }}
+            onDeleteVideo={(id) => persistData('videoLessons', id, 'delete')}
+            onAddSource={(s) => { persistData('educationalSources', s, 'save'); addToast('تمت الإضافة', 'success'); }}
+            onDeleteSource={(id) => persistData('educationalSources', id, 'delete')}
+            settings={settings}
+          />
+        );
+      case AppView.MANAGEMENT:
+        return (
+          <Management 
+            years={years} groups={groups} students={students}
+            teacherName={currentUser.name} platformName={settings.platformName}
+            onAddYear={(n) => { persistData('years', { id: 'y'+Date.now(), name: n }, 'save'); }}
+            onAddGroup={(n, y, t, ty, g, c, p) => { persistData('groups', { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p, joinCode: p+(Math.floor(Math.random()*1000)) }, 'save'); }}
+            onDeleteGroup={(id) => persistData('groups', id, 'delete')}
+          />
+        );
+      case AppView.RESULTS:
+        return (
+          <QuizResults 
+            results={results} students={students} notifications={notifications} notation={settings.mathNotation}
+            onIssueCertificate={() => {}} 
+            onUpdateResult={(id, s, f) => { persistData('results', { id, score: s, feedback: f, status: 'graded' }, 'update'); addToast('تم الرصد', 'success'); }}
+          />
+        );
+      case AppView.CHAT:
+        return (
+          <ChatRoom 
+            user={currentUser} messages={messages} years={years} students={students} notation={settings.mathNotation}
+            onSendMessage={(text, type, recId, audio) => {
+              persistData('messages', { 
+                id: 'm'+Date.now(), text, type, recipientId: recId, audioData: audio, 
+                senderId: currentUser.id, senderName: currentUser.name, senderRole: 'teacher', timestamp: new Date().toLocaleTimeString('ar-EG'), yearId: 'all' 
+              }, 'save');
+            }}
+          />
+        );
+      case AppView.SETTINGS:
+        return (
+          <Settings 
+            settings={settings} assistants={assistants}
+            students={students} submissions={submissions} inquiries={inquiries} notifications={notifications}
+            onUpdate={(s) => { setSettings(s); persistData('settings', s, 'update'); addToast('تم الحفظ', 'success'); }}
+            onAddAssistant={(a) => { persistData('assistants', a, 'save'); addToast('تمت الإضافة', 'success'); }}
+            onDeleteAssistant={(id) => persistData('assistants', id, 'delete')}
+          />
+        );
+      case AppView.CALL_CENTER:
+        return (
+          <CallCenter 
+            inquiries={inquiries} callLogs={callLogs} students={students} teacherName={currentUser.name}
+            onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
+            onAddCallLog={(l) => { persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save'); addToast('تم الحفظ', 'success'); }}
+          />
+        );
+      case AppView.NOTIFICATIONS:
+        return (
+          <Notifications 
+            notifications={notifications} years={years} groups={groups} role="teacher"
+            onSend={(n, push) => { persistData('notifications', { ...n, id: 'n'+Date.now(), timestamp: new Date().toLocaleString('ar-EG'), isRead: false }, 'save'); addToast('تم الإرسال', 'success'); }}
+            onMarkRead={() => {}}
+            onDelete={(id) => persistData('notifications', id, 'delete')}
+          />
+        );
+      case AppView.REWARDS:
+        return (
+          <Rewards 
+            rewards={rewards} redemptions={redemptions} role="teacher"
+            onAddReward={(r) => { persistData('rewards', { ...r, id: 'rw'+Date.now() }, 'save'); }}
+            onDeleteReward={(id) => persistData('rewards', id, 'delete')}
+            onRedeem={() => {}}
+            onMarkDelivered={(id) => { persistData('redemptions', { id, status: 'delivered' }, 'update'); addToast('تم التسليم', 'success'); }}
+          />
+        );
+      case AppView.AI_SOLVER:
+        return <AISolver notation={settings.mathNotation} />;
+      case AppView.LEADERBOARD:
+        return <Leaderboard students={students} years={years} />;
+      case AppView.SCHEDULE:
+        return (
+          <Schedules 
+            groups={groups} schedules={schedules}
+            onAdd={(s) => persistData('schedules', { ...s, id: 'sch'+Date.now() }, 'save')}
+            onDelete={(id) => persistData('schedules', id, 'delete')}
+          />
+        );
+      case AppView.FORMULAS:
+        return (
+          <Formulas 
+            years={years} formulas={formulas}
+            onAdd={(f) => persistData('formulas', { ...f, id: 'frm'+Date.now() }, 'save')}
+            onDelete={(id) => persistData('formulas', id, 'delete')}
+          />
+        );
+      case AppView.TEST_CENTER:
+        return (
+          <TestCenter 
+            students={students} years={years} groups={groups} quizzes={quizzes} assignments={assignments} settings={settings} addToast={addToast}
+            onMockData={(d) => { setStudents(d.students); setYears(d.years); setGroups(d.groups); }}
+            onEnterSimulation={(s) => setCurrentUser({...s, role: 'student'})}
+          />
+        );
+      case AppView.LAUNCH_GUIDE:
+        return <LaunchGuide groups={groups} years={years} teacherName={settings.teacherName} platformName={settings.platformName} addToast={addToast} />;
+      case AppView.CONTROL_PANEL:
+        return (
+          <AdminControlPanel 
+            activeTab="groups"
+            onTabChange={() => {}}
+            years={years} groups={groups} students={students} notifications={notifications} results={results} settings={settings}
+            assistants={assistants} inquiries={inquiries} callLogs={callLogs} schedules={schedules} rewards={rewards} redemptions={redemptions}
+            quizzes={quizzes} assignments={assignments} submissions={submissions}
+            onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }}
+            onAddAssistant={(a) => persistData('assistants', a, 'save')}
+            onDeleteAssistant={(id) => persistData('assistants', id, 'delete')}
+            onAddYear={(n) => persistData('years', { id: 'y'+Date.now(), name: n }, 'save')}
+            onAddGroup={(n, y, t, ty, g, c, p) => persistData('groups', { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p }, 'save')}
+            onDeleteGroup={(id) => persistData('groups', id, 'delete')}
+            onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
+            onAddCallLog={(l) => persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save')}
+            onSendNotif={(n) => persistData('notifications', { ...n, id: 'n'+Date.now() }, 'save')}
+            onDeleteNotif={(id) => persistData('notifications', id, 'delete')}
+            onMarkNotifRead={() => {}}
+            onUpdateResult={(id, s, f) => persistData('results', { id, score: s, feedback: f, status: 'graded' }, 'update')}
+            onAddReward={(r) => persistData('rewards', { ...r, id: 'rw'+Date.now() }, 'save')}
+            onDeleteReward={(id) => persistData('rewards', id, 'delete')}
+            onMarkRewardDelivered={(id) => persistData('redemptions', { id, status: 'delivered' }, 'update')}
+            onAddSchedule={(s) => persistData('schedules', { ...s, id: 'sch'+Date.now() }, 'save')}
+            onDeleteSchedule={(id) => persistData('schedules', id, 'delete')}
+            onMockData={() => {}}
+            onEnterSimulation={(s) => setCurrentUser({...s, role: 'student'})}
+            addToast={addToast}
+            loggedUser={currentUser}
+          />
+        );
+      case AppView.SECTIONS:
+        return (
+          <Sections 
+            sections={settings.customSections || []} 
+            onUpdateSections={(secs) => {
+              const newSettings = { ...settings, customSections: secs };
+              setSettings(newSettings);
+              persistData('settings', newSettings, 'update');
+            }} 
+          />
+        );
+      
+      // Render custom sections
+      default:
+        const customSec = settings.customSections?.find(s => s.id === currentView);
+        if (customSec) {
+          return (
+            <div className="max-w-4xl mx-auto p-8 bg-white rounded-[3rem] shadow-xl text-right animate-slideUp">
+               <h2 className="text-3xl font-black mb-6">{customSec.title}</h2>
+               <div className="prose prose-lg max-w-none">
+                  {customSec.content}
+               </div>
+            </div>
+          );
+        }
+        return <Dashboard 
+          teacherName={currentUser.name} 
+          platformName={settings.platformName}
+          students={students}
+          quizzes={quizzes}
+          assignments={assignments}
+          submissions={submissions}
+          settings={settings}
+          onNavigate={setCurrentView}
+          loggedUser={currentUser}
+        />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#0a0f1e] flex overflow-hidden font-['Cairo']" dir="rtl">
-      <InstallPWA />
+    <div className="min-h-screen bg-slate-50 flex" style={fontStyle}>
+      {/* Teacher Sidebar */}
       <Sidebar 
-        currentView={currentView} setView={handleNavigate} settings={settings} loggedUser={loggedUser} onUpdateSettings={handleUpdateSettings} 
-        unreadNotifCount={notifications.filter(n => !n.isRead).length}
+        currentView={currentView} 
+        setView={setCurrentView} 
+        settings={settings} 
+        loggedUser={currentUser}
+        onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }}
         pendingCount={submissions.filter(s => s.status === 'pending').length}
-        isConnected={isDataLoaded}
+        unreadChatCount={messages.filter(m => m.senderRole === 'student' && !m.readBy?.includes('teacher')).length}
+        isConnected={!isDemoMode}
       />
-      <main className="flex-1 overflow-y-auto bg-slate-50/30 no-scrollbar">
-        <div className="p-4 lg:p-12 max-w-7xl mx-auto">{renderTeacherView()}</div>
+
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen no-scrollbar relative">
+        {renderTeacherContent()}
+        <BottomNav 
+          currentView={currentView} 
+          setView={setCurrentView} 
+          settings={settings} 
+          loggedUser={currentUser} 
+        />
       </main>
-      <BottomNav currentView={currentView} setView={handleNavigate} settings={settings} pendingCount={submissions.filter(s => s.status === 'pending').length} loggedUser={loggedUser} />
-      <ToastContainer toasts={toasts} onClose={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
+
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <InstallPWA />
     </div>
   );
 };
