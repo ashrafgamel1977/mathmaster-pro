@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { 
   AppView, PlatformSettings, Student, Year, Group, Quiz, Assignment, 
   AssignmentSubmission, QuizResult, VideoLesson, EducationalSource, 
@@ -7,34 +7,34 @@ import {
   ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, VideoView, VideoNote, CustomSection
 } from './types';
 
-// Views
-import LandingPage from './views/LandingPage';
-import Dashboard from './views/Dashboard';
-import StudentPortal from './views/StudentPortal';
-import ParentPortal from './views/ParentPortal';
-import StudentList from './components/StudentList';
-import AssignmentsView from './views/AssignmentsView'; // Fixed import path
-import QuizGenerator from './views/QuizGenerator';
-import LiveClass from './views/LiveClass';
-import FilesView from './views/Files';
-import Management from './views/Management';
-import QuizResults from './views/QuizResults';
-import Settings from './views/Settings';
-import ChatRoom from './views/ChatRoom';
-import CallCenter from './views/CallCenter';
-import TestCenter from './views/TestCenter';
-import LaunchGuide from './views/LaunchGuide';
-import Leaderboard from './views/Leaderboard';
-import AISolver from './views/AISolver';
-import Notifications from './views/Notifications';
-import Formulas from './views/Formulas';
-import Registration from './views/Registration';
-import Rewards from './views/Rewards';
-import AdminControlPanel from './views/AdminControlPanel';
-import Schedules from './views/Schedules';
-import Sections from './views/Sections';
+// Lazy Load Views for Performance
+const LandingPage = lazy(() => import('./views/LandingPage'));
+const Dashboard = lazy(() => import('./views/Dashboard'));
+const StudentPortal = lazy(() => import('./views/StudentPortal'));
+const ParentPortal = lazy(() => import('./views/ParentPortal'));
+const StudentList = lazy(() => import('./components/StudentList'));
+const AssignmentsView = lazy(() => import('./views/Assignments'));
+const QuizGenerator = lazy(() => import('./views/QuizGenerator'));
+const LiveClass = lazy(() => import('./views/LiveClass'));
+const FilesView = lazy(() => import('./views/Files'));
+const Management = lazy(() => import('./views/Management'));
+const QuizResults = lazy(() => import('./views/QuizResults'));
+const Settings = lazy(() => import('./views/Settings'));
+const ChatRoom = lazy(() => import('./views/ChatRoom'));
+const CallCenter = lazy(() => import('./views/CallCenter'));
+const TestCenter = lazy(() => import('./views/TestCenter'));
+const LaunchGuide = lazy(() => import('./views/LaunchGuide'));
+const Leaderboard = lazy(() => import('./views/Leaderboard'));
+const AISolver = lazy(() => import('./views/AISolver'));
+const Notifications = lazy(() => import('./views/Notifications'));
+const Formulas = lazy(() => import('./views/Formulas'));
+const Registration = lazy(() => import('./views/Registration'));
+const Rewards = lazy(() => import('./views/Rewards'));
+const AdminControlPanel = lazy(() => import('./views/AdminControlPanel'));
+const Schedules = lazy(() => import('./views/Schedules'));
+const Sections = lazy(() => import('./views/Sections'));
 
-// Components
+// Components (Keep Sidebar/BottomNav eager if small, or lazy if needed)
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import { ToastContainer, ToastProps } from './components/Toast';
@@ -89,7 +89,7 @@ const INITIAL_SETTINGS: PlatformSettings = {
     showLeaderboard: true,
     showTools: true
   },
-  enabledViews: Object.values(AppView), // Default to ALL views enabled
+  enabledViews: Object.values(AppView),
   featureConfig: {
     [AppView.STUDENT_PORTAL]: [
       { id: 'dashboard', label: 'الرئيسية', enabled: true },
@@ -119,10 +119,15 @@ const INITIAL_SETTINGS: PlatformSettings = {
   }
 };
 
+const LoadingSpinner = () => (
+  <div className="flex justify-center items-center h-full min-h-[50vh]">
+    <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+  </div>
+);
+
 const App: React.FC = () => {
-  // --- State Management ---
   const [currentView, setCurrentView] = useState<AppView | string>(AppView.DASHBOARD);
-  const [currentUser, setCurrentUser] = useState<any>(null); // { role, id, name, ... }
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [settings, setSettings] = useState<PlatformSettings>(INITIAL_SETTINGS);
   
   // Data Collections
@@ -149,18 +154,15 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<Omit<ToastProps, 'onClose'>[]>([]);
   const [isDemoMode, setIsDemoMode] = useState(isUsingDefaultConfig());
 
-  // --- Helper for Safe Storage ---
   const safeSetItem = (key: string, value: any) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.warn(`Failed to save ${key} to localStorage (Circular structure or quota exceeded)`, e);
+      console.warn(`Failed to save ${key} to localStorage`, e);
     }
   };
 
-  // --- Effects ---
   useEffect(() => {
-    // Load local settings/user if available
     try {
       const savedUser = localStorage.getItem('math_user');
       if (savedUser) setCurrentUser(JSON.parse(savedUser));
@@ -171,9 +173,7 @@ const App: React.FC = () => {
       console.error("Error loading local storage data", e);
     }
 
-    // Data Loading (Firebase or LocalStorage for Demo)
     if (!isDemoMode) {
-      // Subscribe to Firebase collections
       const unsubs = [
         subscribeToCollection('students', setStudents),
         subscribeToCollection('years', setYears),
@@ -209,7 +209,6 @@ const App: React.FC = () => {
       ];
       return () => unsubs.forEach(unsub => unsub());
     } else {
-      // Initialize Mock Data
       if (students.length === 0) {
         const mockStudent: Student = {
           id: 's_demo_1',
@@ -245,7 +244,6 @@ const App: React.FC = () => {
     }
   }, [settings, isDemoMode, currentUser]);
 
-  // --- Handlers ---
   const addToast = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -367,34 +365,32 @@ const App: React.FC = () => {
   const fontStyle = { fontFamily: settings.branding.fontFamily || 'Cairo' };
 
   if (!currentUser) {
-    if (currentView === AppView.REGISTRATION) {
-      return (
-        <div style={fontStyle}>
-          <Registration 
-            years={years} 
-            groups={groups} 
-            onRegister={(data) => {
-              const newStudent = { ...data, id: 's' + Date.now(), points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [] };
-              persistData('students', newStudent, 'save');
-              addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
-              handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
-            }}
-            onBack={() => setCurrentView(AppView.DASHBOARD)}
-            teacherName={settings.teacherName}
-          />
-          <InstallPWA />
-        </div>
-      );
-    }
     return (
       <div style={fontStyle}>
-        <LandingPage 
-          teacherName={settings.teacherName} 
-          platformName={settings.platformName}
-          settings={settings}
-          onUnifiedLogin={handleUnifiedLogin} 
-          onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} 
-        />
+        <Suspense fallback={<LoadingSpinner />}>
+          {currentView === AppView.REGISTRATION ? (
+            <Registration 
+              years={years} 
+              groups={groups} 
+              onRegister={(data) => {
+                const newStudent = { ...data, id: 's' + Date.now(), points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [] };
+                persistData('students', newStudent, 'save');
+                addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
+                handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
+              }}
+              onBack={() => setCurrentView(AppView.DASHBOARD)}
+              teacherName={settings.teacherName}
+            />
+          ) : (
+            <LandingPage 
+              teacherName={settings.teacherName} 
+              platformName={settings.platformName}
+              settings={settings}
+              onUnifiedLogin={handleUnifiedLogin} 
+              onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} 
+            />
+          )}
+        </Suspense>
         <InstallPWA />
       </div>
     );
@@ -403,78 +399,80 @@ const App: React.FC = () => {
   if (currentUser.role === 'student') {
     return (
       <div style={fontStyle}>
-        <StudentPortal 
-          student={currentUser}
-          assignments={assignments}
-          submissions={submissions}
-          quizzes={quizzes}
-          results={results}
-          settings={settings}
-          videoLessons={videoLessons}
-          notifications={notifications}
-          groups={groups}
-          educationalSources={educationalSources}
-          schedules={schedules}
-          formulas={formulas}
-          rewards={rewards}
-          redemptions={redemptions}
-          messages={messages}
-          years={years}
-          students={students}
-          onQuizSubmit={(res) => persistData('results', res, 'save')}
-          onAssignmentSubmit={(sub) => persistData('submissions', { ...sub, id: 'sub' + Date.now(), status: 'pending' }, 'save')}
-          onLogin={() => {}} 
-          onSendMessage={(text, type, recipientId, audioData) => {
-            const msg = { 
-              id: 'msg' + Date.now(), 
-              text, type, recipientId, audioData, 
-              senderId: currentUser.id, 
-              senderName: currentUser.name, 
-              senderRole: 'student', 
-              timestamp: new Date().toLocaleTimeString('ar-EG'),
-              yearId: currentUser.yearId 
-            };
-            persistData('messages', msg, 'save');
-          }}
-          onMarkNotificationRead={(id) => { }}
-          onRedeemReward={(rId) => {
-            const reward = rewards.find(r => r.id === rId);
-            if (reward && currentUser.points >= reward.cost) {
-              persistData('redemptions', { 
-                id: 'red' + Date.now(), 
-                studentId: currentUser.id, 
-                studentName: currentUser.name, 
-                rewardId: reward.id, 
-                rewardTitle: reward.title, 
-                status: 'pending', 
-                timestamp: new Date().toLocaleDateString('ar-EG') 
-              }, 'save');
-              const newPoints = currentUser.points - reward.cost;
-              persistData('students', { id: currentUser.id, points: newPoints }, 'update');
-              setCurrentUser({ ...currentUser, points: newPoints });
-              addToast('تم طلب الجائزة بنجاح', 'success');
-            }
-          }}
-          onSpinWin={(points) => {
-            const newPoints = (currentUser.points || 0) + points;
-            persistData('students', { id: currentUser.id, points: newPoints, lastSpinDate: new Date().toISOString() }, 'update');
-            setCurrentUser({ ...currentUser, points: newPoints, lastSpinDate: new Date().toISOString() });
-            addToast(`مبروك! ربحت ${points} نقطة`, 'success');
-          }}
-          onUpdateStudent={(updates) => {
-            persistData('students', { id: currentUser.id, ...updates }, 'update');
-            setCurrentUser({ ...currentUser, ...updates });
-          }}
-          onRateSource={(srcId, rating) => {
-            const source = educationalSources.find(s => s.id === srcId);
-            if(source) {
-              const newRatings = [...(source.ratings || []).filter(r => r.studentId !== currentUser.id), { studentId: currentUser.id, value: rating }];
-              persistData('educationalSources', { id: srcId, ratings: newRatings }, 'update');
-            }
-          }}
-          onVideoProgress={handleVideoProgress}
-          onBack={handleLogout}
-        />
+        <Suspense fallback={<LoadingSpinner />}>
+          <StudentPortal 
+            student={currentUser}
+            assignments={assignments}
+            submissions={submissions}
+            quizzes={quizzes}
+            results={results}
+            settings={settings}
+            videoLessons={videoLessons}
+            notifications={notifications}
+            groups={groups}
+            educationalSources={educationalSources}
+            schedules={schedules}
+            formulas={formulas}
+            rewards={rewards}
+            redemptions={redemptions}
+            messages={messages}
+            years={years}
+            students={students}
+            onQuizSubmit={(res) => persistData('results', res, 'save')}
+            onAssignmentSubmit={(sub) => persistData('submissions', { ...sub, id: 'sub' + Date.now(), status: 'pending' }, 'save')}
+            onLogin={() => {}} 
+            onSendMessage={(text, type, recipientId, audioData) => {
+              const msg = { 
+                id: 'msg' + Date.now(), 
+                text, type, recipientId, audioData, 
+                senderId: currentUser.id, 
+                senderName: currentUser.name, 
+                senderRole: 'student', 
+                timestamp: new Date().toLocaleTimeString('ar-EG'),
+                yearId: currentUser.yearId 
+              };
+              persistData('messages', msg, 'save');
+            }}
+            onMarkNotificationRead={(id) => { }}
+            onRedeemReward={(rId) => {
+              const reward = rewards.find(r => r.id === rId);
+              if (reward && currentUser.points >= reward.cost) {
+                persistData('redemptions', { 
+                  id: 'red' + Date.now(), 
+                  studentId: currentUser.id, 
+                  studentName: currentUser.name, 
+                  rewardId: reward.id, 
+                  rewardTitle: reward.title, 
+                  status: 'pending', 
+                  timestamp: new Date().toLocaleDateString('ar-EG') 
+                }, 'save');
+                const newPoints = currentUser.points - reward.cost;
+                persistData('students', { id: currentUser.id, points: newPoints }, 'update');
+                setCurrentUser({ ...currentUser, points: newPoints });
+                addToast('تم طلب الجائزة بنجاح', 'success');
+              }
+            }}
+            onSpinWin={(points) => {
+              const newPoints = (currentUser.points || 0) + points;
+              persistData('students', { id: currentUser.id, points: newPoints, lastSpinDate: new Date().toISOString() }, 'update');
+              setCurrentUser({ ...currentUser, points: newPoints, lastSpinDate: new Date().toISOString() });
+              addToast(`مبروك! ربحت ${points} نقطة`, 'success');
+            }}
+            onUpdateStudent={(updates) => {
+              persistData('students', { id: currentUser.id, ...updates }, 'update');
+              setCurrentUser({ ...currentUser, ...updates });
+            }}
+            onRateSource={(srcId, rating) => {
+              const source = educationalSources.find(s => s.id === srcId);
+              if(source) {
+                const newRatings = [...(source.ratings || []).filter(r => r.studentId !== currentUser.id), { studentId: currentUser.id, value: rating }];
+                persistData('educationalSources', { id: srcId, ratings: newRatings }, 'update');
+              }
+            }}
+            onVideoProgress={handleVideoProgress}
+            onBack={handleLogout}
+          />
+        </Suspense>
         <InstallPWA />
       </div>
     );
@@ -483,14 +481,16 @@ const App: React.FC = () => {
   if (currentUser.role === 'parent') {
     return (
       <div style={fontStyle}>
-        <ParentPortal 
-          student={currentUser} 
-          results={results} 
-          onLogin={() => {}} 
-          settings={settings}
-          onSendInquiry={(inq) => { persistData('inquiries', inq, 'save'); addToast('تم إرسال الطلب', 'success'); }}
-          onBack={handleLogout}
-        />
+        <Suspense fallback={<LoadingSpinner />}>
+          <ParentPortal 
+            student={currentUser} 
+            results={results} 
+            onLogin={() => {}} 
+            settings={settings}
+            onSendInquiry={(inq) => { persistData('inquiries', inq, 'save'); addToast('تم إرسال الطلب', 'success'); }}
+            onBack={handleLogout}
+          />
+        </Suspense>
         <InstallPWA />
       </div>
     );
@@ -507,8 +507,6 @@ const App: React.FC = () => {
             quizzes={quizzes}
             assignments={assignments}
             submissions={submissions}
-            results={results} // Passed results to Dashboard
-            groups={groups} // Passed groups to Dashboard
             settings={settings}
             onNavigate={setCurrentView}
             loggedUser={currentUser}
@@ -570,7 +568,7 @@ const App: React.FC = () => {
         return (
           <StudentList 
             students={students} groups={groups} years={years} notifications={notifications}
-            submissions={submissions} results={results} // Pass these props
+            submissions={submissions} results={results} 
             teacherName={currentUser.name}
             onAttendanceChange={(id) => {
               const s = students.find(x => x.id === id);
@@ -742,7 +740,7 @@ const App: React.FC = () => {
             onAddAssistant={(a) => persistData('assistants', a, 'save')}
             onDeleteAssistant={(id) => persistData('assistants', id, 'delete')}
             onAddYear={(n) => persistData('years', { id: 'y'+Date.now(), name: n }, 'save')}
-            onAddGroup={(n, y, t, ty, g, c, p) => persistData('groups', { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p }, 'save')}
+            onAddGroup={(n, y, t, ty, g, c, p) => persistData('groups', { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p, joinCode: p+(Math.floor(Math.random()*1000)) }, 'save')}
             onDeleteGroup={(id) => persistData('groups', id, 'delete')}
             onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
             onAddCallLog={(l) => persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save')}
@@ -773,7 +771,6 @@ const App: React.FC = () => {
           />
         );
       
-      // Render custom sections
       default:
         const customSec = settings.customSections?.find(s => s.id === currentView);
         if (customSec) {
@@ -802,7 +799,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex" style={fontStyle}>
-      {/* Teacher Sidebar */}
       <Sidebar 
         currentView={currentView} 
         setView={setCurrentView} 
@@ -815,7 +811,9 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen no-scrollbar relative pb-32">
-        {renderTeacherContent()}
+        <Suspense fallback={<LoadingSpinner />}>
+          {renderTeacherContent()}
+        </Suspense>
         <BottomNav 
           currentView={currentView} 
           setView={setCurrentView} 
@@ -831,3 +829,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+    

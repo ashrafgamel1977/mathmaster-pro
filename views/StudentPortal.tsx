@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Student, QuizResult, Assignment, PlatformSettings, VideoLesson, Quiz, AssignmentSubmission, ChatMessage, Year, AppNotification, Group, EducationalSource, ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, AppView, QuestionAttempt } from '../types';
 import LuckyWheel from '../components/LuckyWheel';
@@ -80,6 +81,10 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
 
   const [isFabOpen, setIsFabOpen] = useState(false);
 
+  // --- Drag and Drop State ---
+  const [orderedTabs, setOrderedTabs] = useState<any[]>([]);
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+
   const isTeacherPreview = student?.id === 'teacher-view';
 
   const DEFAULT_TABS: { id: string; label: string; icon: string; disabled?: boolean }[] = [
@@ -90,7 +95,8 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
     { id: 'results', label: 'نتائجي', icon: '📊' }
   ];
 
-  const sidebarTabs = useMemo(() => {
+  // Memoize the initial tabs based on settings
+  const initialTabs = useMemo(() => {
     if (!settings.featureConfig?.[AppView.STUDENT_PORTAL]) return DEFAULT_TABS;
     const config = settings.featureConfig[AppView.STUDENT_PORTAL];
     return DEFAULT_TABS.map(tab => {
@@ -99,6 +105,52 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
         return tab;
     }).filter(t => !t.disabled);
   }, [settings]);
+
+  // Sync state with settings, preserving order if IDs match
+  useEffect(() => {
+    if (orderedTabs.length === 0) {
+        setOrderedTabs(initialTabs);
+    } else {
+        // If settings changed (e.g. enabled/disabled), update list but try to keep order
+        const currentIds = new Set(initialTabs.map(t => t.id));
+        const newOrdered = orderedTabs.filter(t => currentIds.has(t.id));
+        
+        // Add any new tabs that might have appeared
+        initialTabs.forEach(t => {
+            if (!newOrdered.find(ot => ot.id === t.id)) {
+                newOrdered.push(t);
+            }
+        });
+        
+        // Update labels if changed in settings
+        const finalTabs = newOrdered.map(t => {
+            const freshData = initialTabs.find(it => it.id === t.id);
+            return freshData || t;
+        });
+
+        setOrderedTabs(finalTabs);
+    }
+  }, [initialTabs]);
+
+  // --- DnD Handlers ---
+  const handleDragStart = (index: number) => {
+    setDraggedItemIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // Necessary to allow dropping
+  };
+
+  const handleDrop = (dropIndex: number) => {
+    if (draggedItemIndex === null) return;
+    
+    const newTabs = [...orderedTabs];
+    const [draggedItem] = newTabs.splice(draggedItemIndex, 1);
+    newTabs.splice(dropIndex, 0, draggedItem);
+    
+    setOrderedTabs(newTabs);
+    setDraggedItemIndex(null);
+  };
 
   useEffect(() => {
     if (scannerImage && canvasRef.current) {
@@ -281,17 +333,24 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
     (isTeacherPreview || s.yearId === student.yearId || s.yearId === 'all')
   );
   
-  const SidebarItem: React.FC<{ id: string; label: string; icon: string; active: boolean }> = ({ id, label, icon, active }) => (
+  // Custom Sidebar Item Component
+  const SidebarItem: React.FC<{ id: string; label: string; icon: string; active: boolean; index: number }> = ({ id, label, icon, active, index }) => (
     <button 
       onClick={() => setActiveTab(id as any)}
-      className={`w-full flex items-center gap-4 px-6 py-4 transition-all duration-300 border-r-4 ${
+      className={`w-full flex items-center gap-4 px-6 py-4 transition-all duration-300 border-r-4 select-none ${
         active 
           ? 'bg-white/10 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]' 
           : 'border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200'
-      }`}
+      } ${draggedItemIndex === index ? 'opacity-50 border-dashed border-slate-500 scale-95' : ''}`}
+      draggable
+      onDragStart={() => handleDragStart(index)}
+      onDragOver={handleDragOver}
+      onDrop={() => handleDrop(index)}
+      style={{ cursor: 'grab' }}
     >
       <span className={`text-xl transition-transform ${active ? 'scale-110' : ''}`}>{icon}</span>
       <span className={`text-sm ${active ? 'font-black' : 'font-medium'}`}>{label}</span>
+      <span className="mr-auto text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity text-xs">⋮⋮</span>
     </button>
   );
 
@@ -373,8 +432,8 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
             </div>
          </div>
          <nav className="flex-1 py-4 space-y-2 px-2">
-            {sidebarTabs.map(tab => (
-               <SidebarItem key={tab.id} id={tab.id} label={tab.label} icon={tab.icon} active={activeTab === tab.id} />
+            {orderedTabs.map((tab, idx) => (
+               <SidebarItem key={tab.id} id={tab.id} label={tab.label} icon={tab.icon} active={activeTab === tab.id} index={idx} />
             ))}
          </nav>
          <div className="p-4 border-t border-white/5 bg-[#1e293b]/50 backdrop-blur-sm">
@@ -398,7 +457,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
          <div className="lg:hidden bg-[#0f172a]/90 backdrop-blur-md p-4 flex justify-between items-center border-b border-white/10 sticky top-0 z-30 shadow-lg">
             <div className="flex items-center gap-3">
                <div className="w-8 h-8 bg-amber-500 text-white rounded-lg flex items-center justify-center text-lg font-black">∑</div>
-               <span className="font-black text-white text-sm">{sidebarTabs.find(t=>t.id===activeTab)?.label}</span>
+               <span className="font-black text-white text-sm">{orderedTabs.find(t=>t.id===activeTab)?.label}</span>
             </div>
             <button onClick={onBack} className="text-slate-400 hover:text-rose-500 text-sm font-bold bg-white/5 px-3 py-1 rounded-lg">خروج</button>
          </div>
@@ -548,7 +607,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
          <div className="lg:hidden fixed bottom-6 left-6 z-[100] flex flex-col items-start gap-4">
             {isFabOpen && (
                <div className="flex flex-col gap-3 mb-2 animate-slideUp">
-                  {sidebarTabs.map((tab) => (
+                  {orderedTabs.map((tab) => (
                      <button
                         key={tab.id}
                         onClick={() => { setActiveTab(tab.id); setIsFabOpen(false); }}

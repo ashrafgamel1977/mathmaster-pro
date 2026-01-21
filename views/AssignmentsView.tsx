@@ -14,7 +14,7 @@ interface AssignmentsViewProps {
   teacherName: string;
   notation: MathNotation;
   onAdd: (a: Assignment) => void;
-  onUpdate: (a: Assignment) => void; // New Prop for updating
+  onUpdate: (a: Assignment) => void;
   onDelete: (id: string) => void;
   onGrade: (submissionId: string, grade: number, feedback: string, correctedImg?: string) => void;
 }
@@ -27,9 +27,8 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
   const [gradingSub, setGradingSub] = useState<AssignmentSubmission | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'link' | 'file' | 'board'>('board');
   const [showBoard, setShowBoard] = useState(false);
-  const [showPreview, setShowPreview] = useState(false); // Toggle preview mode
+  const [showPreview, setShowPreview] = useState(false);
   
-  // AI Grading State
   const [analyzingSubId, setAnalyzingSubId] = useState<string | null>(null);
   const [aiGradingData, setAiGradingData] = useState<{ grade: number, feedback: string } | null>(null);
 
@@ -105,7 +104,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       status: asg.status as 'active' | 'archived',
       attachments: asg.attachments || []
     });
-    // Set active tab based on existing data
+    
     if (asg.fileUrl) setActiveTab(asg.description.includes('السبورة') ? 'board' : 'file');
     else if (asg.externalLink) setActiveTab('link');
     else setActiveTab('text');
@@ -140,22 +139,17 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     }
   };
 
-  // Rich Text Editor Functions
   const insertAtCursor = (prefix: string, suffix: string = '') => {
     const textarea = descTextareaRef.current;
     if (!textarea) return;
-
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = newAsg.desc;
     const before = text.substring(0, start);
     const selection = text.substring(start, end);
     const after = text.substring(end);
-
     const newText = before + prefix + selection + suffix + after;
     setNewAsg({ ...newAsg, desc: newText });
-
-    // Restore focus and cursor
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + prefix.length, end + prefix.length);
@@ -185,13 +179,11 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     setNewAsg(prev => ({ 
       ...prev, 
       fileUrl: dataUrl,
-      desc: prev.desc + (prev.desc ? '\n' : '') + '[رسم توضيحي مرفق من السبورة]'
+      desc: prev.desc || 'واجب مرسوم من السبورة'
     }));
     setShowBoard(false);
-    alert('تم التقاط الرسم وإلحاقه بالواجب بنجاح ✓');
   };
 
-  // Helper to check if assignment is overdue
   const isPastDue = (dateString: string) => {
     if (!dateString) return false;
     const today = new Date();
@@ -205,14 +197,12 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       alert("لا يوجد ملف مرفق لتحليله.");
       return;
     }
-    
     setAnalyzingSubId(sub.id);
     try {
       const aiResponse = await analyzeStudentWork(
-        { data: sub.fileUrl, mimeType: 'image/jpeg' }, // Defaulting to jpeg, service extracts actual from base64 header usually
+        { data: sub.fileUrl, mimeType: 'image/jpeg' }, 
         notation
       );
-
       setAiGradingData({
         grade: aiResponse.suggestedGrade,
         feedback: aiResponse.feedback
@@ -259,9 +249,17 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                 } ${isExpanded ? 'row-span-2 shadow-2xl ring-2 ring-indigo-50' : ''}`}
               >
                  <div className="flex justify-between items-start mb-4">
-                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${overdue ? 'bg-white text-rose-500 shadow-sm' : 'bg-indigo-50 text-indigo-600'}`}>
-                      {years.find(y=>y.id===asg.yearId)?.name}
-                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${overdue ? 'bg-white text-rose-500 shadow-sm' : 'bg-indigo-50 text-indigo-600'}`}>
+                        {years.find(y=>y.id===asg.yearId)?.name}
+                      </span>
+                      {overdue && (
+                        <span className="flex items-center gap-1 px-2 py-1 bg-rose-600 text-white rounded-lg text-[9px] font-black shadow-lg shadow-rose-200 animate-pulse">
+                           <span>⏰</span>
+                           <span>متأخر</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={(e) => handleEditClick(e, asg)} className="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-all shadow-sm border border-slate-100">✎</button>
                       <button onClick={(e) => { e.stopPropagation(); onDelete(asg.id); }} className="w-8 h-8 rounded-full bg-white text-rose-300 hover:text-rose-500 flex items-center justify-center transition-all shadow-sm border border-slate-100">🗑️</button>
@@ -586,42 +584,5 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       )}
 
       {showBoard && (
-        <div className="fixed inset-0 z-[600] bg-indigo-950 p-0 md:p-2 flex flex-col animate-fadeIn">
-           <div className="flex justify-between items-center p-4 px-6 text-white bg-indigo-950/90 backdrop-blur-md sticky top-0 z-10">
-              <h3 className="font-black text-lg md:text-2xl">سبورة رسم الواجب 🖋️</h3>
-              <button onClick={() => setShowBoard(false)} className="w-10 h-10 bg-white/10 hover:bg-rose-600 rounded-xl flex items-center justify-center text-xl transition-all">✕</button>
-           </div>
-           <div className="flex-1 bg-white rounded-t-[2rem] md:rounded-[4rem] overflow-hidden shadow-2xl relative">
-              <InteractiveBoard 
-                onSave={handleBoardCapture} 
-                onCancel={() => setShowBoard(false)} 
-                title="رسم محتوى الواجب" 
-                initialBackground="grid"
-                notation={notation}
-              />
-           </div>
-        </div>
-      )}
-
-      {gradingSub && (
-        <AssignmentGrading 
-          submission={gradingSub}
-          student={students.find(s => s.id === gradingSub.studentId)}
-          assignment={assignments.find(a => a.id === gradingSub.assignmentId)}
-          onGrade={(sid, grade, feedback, correctedImg) => {
-            onGrade(sid, grade, feedback, correctedImg);
-            setGradingSub(null);
-            setAiGradingData(null);
-          }}
-          onCancel={() => {
-            setGradingSub(null);
-            setAiGradingData(null);
-          }}
-          aiParams={aiGradingData} // Pass the AI data to pre-fill fields
-        />
-      )}
-    </div>
-  );
-};
-
-export default AssignmentsView;
+        <div className="fixed inset-0 z-[600] bg-indigo-950 p-2 md:p-6 flex flex-col animate-fadeIn">
+           <div className="flex justify-between

@@ -4,11 +4,11 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // ============================================================================
-// ✅ تم ربط التطبيق بقاعدة البيانات الخاصة بك بنجاح
+// إعدادات Firebase - يتم التعامل معها بمرونة
 // ============================================================================
 
 const PERMANENT_CONFIG = {
-  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",
+  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA", // تأكد من صحة هذا المفتاح في لوحة تحكم Firebase
   authDomain: "mathmaster-pri.firebaseapp.com",
   projectId: "mathmaster-pri",
   storageBucket: "mathmaster-pri.firebasestorage.app",
@@ -17,64 +17,58 @@ const PERMANENT_CONFIG = {
   measurementId: "G-JK1YWQ8ZY7"
 };
 
-// ============================================================================
-// لا تقم بتعديل أي شيء أسفل هذا الخط ⛔
-// ============================================================================
+let app = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+let initializationError: string | null = null; // متغير لتخزين رسالة الخطأ
 
-const getConfig = () => {
-  return PERMANENT_CONFIG;
-};
-
-const config = getConfig();
-let app;
-let db: Firestore;
-let storage: FirebaseStorage;
-
-const isConfigValid = config.apiKey && !config.apiKey.includes('YOUR_API_KEY');
-
-if (isConfigValid) {
+const initFirebase = () => {
   try {
-    app = initializeApp(config);
+    // التحقق السريع من صحة التكوين قبل المحاولة
+    if (!PERMANENT_CONFIG.apiKey || PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
+      initializationError = "API Key is missing or placeholder.";
+      console.warn("⚠️ Firebase Config: Missing API Key. App will run in Offline Mode.");
+      return;
+    }
+
+    app = initializeApp(PERMANENT_CONFIG);
     
-    // Using standard getFirestore to avoid bundle mismatch issues
     try {
-        db = getFirestore(app);
-    } catch (err) {
-        console.error("Firestore Init Error:", err);
+      db = getFirestore(app);
+      console.log("✅ Database Connected");
+    } catch (e: any) {
+      initializationError = e.message || "Firestore Init Failed";
+      console.warn("⚠️ Database Connection Failed (Using Local Storage):", e);
     }
 
     try {
       storage = getStorage(app);
-    } catch (storageError) {
-      console.warn("Storage service not available (Running with Database only).");
+    } catch (e: any) {
+      console.warn("⚠️ Storage Connection Failed (Using Local Encoding):", e);
     }
-    console.log("Firebase Initialized Successfully ✅");
-  } catch (error) {
-    console.error("Firebase Init Error ❌", error);
+
+  } catch (error: any) {
+    initializationError = error.message || "Unknown Firebase Init Error";
+    console.error("❌ Firebase Critical Init Error (App will continue offline):", error);
   }
-} else {
-  console.log("⚠️ التطبيق يعمل في وضع المحاكاة (Demo Mode) لعدم وجود مفاتيح Firebase.");
-}
+};
+
+// تنفيذ التهيئة
+initFirebase();
 
 export { db, storage };
 
+// دالة لاسترجاع الخطأ لعرضه في الواجهة
+export const getFirebaseInitError = () => {
+    return initializationError;
+};
+
+// دالة مساعدة للتحقق من حالة النظام
+export const isOnlineMode = () => {
+  return db !== null;
+};
+
+// التحقق مما إذا كان التطبيق يستخدم التكوين الافتراضي (وضع العرض التجريبي/غير المتصل)
 export const isUsingDefaultConfig = () => {
-  if (PERMANENT_CONFIG.apiKey && !PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
-    return false; // التطبيق يعمل أونلاين
-  }
-  return true; 
-};
-
-export const saveConfig = (newConfig: any) => {
-  try {
-    localStorage.setItem('math_firebase_config', JSON.stringify(newConfig));
-    window.location.reload();
-  } catch (e) {
-    console.error("Failed to save config", e);
-  }
-};
-
-export const resetConfig = () => {
-  localStorage.removeItem('math_firebase_config');
-  window.location.reload();
+  return !PERMANENT_CONFIG.apiKey || PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY');
 };

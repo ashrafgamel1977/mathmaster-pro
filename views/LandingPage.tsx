@@ -63,14 +63,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
       </div>
 
-      {/* Manual Install Button - Enhanced for higher visibility */}
+      {/* Manual Install Button */}
       <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-2">
           <button 
             onClick={triggerInstall}
             className="bg-gradient-to-r from-indigo-600 to-blue-700 hover:from-indigo-500 hover:to-blue-600 text-white px-5 py-3 rounded-2xl backdrop-blur-md border border-white/20 font-black text-xs flex items-center gap-3 transition-all shadow-[0_10px_20px_rgba(37,99,235,0.3)] hover:scale-105 active:scale-95"
+            aria-label="Install App"
           >
             <span className="flex flex-col items-start leading-none">
-                <span className="text-[10px] opacity-80 mb-1 font-bold">للحصول على التنبيهات</span>
+                <span className="text-[10px] opacity-90 mb-1 font-bold">للحصول على التنبيهات</span>
                 <span>تثبيت التطبيق 📲</span>
             </span>
           </button>
@@ -86,7 +87,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                 <img 
                   src={settings.branding.heroImageUrl} 
                   className="relative w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-[#0f172a] shadow-2xl"
-                  alt="Teacher"
+                  alt="Teacher Profile"
+                  width="160"
+                  height="160"
                 />
              ) : (
                <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-full flex items-center justify-center bg-[#0f172a] border-4 border-amber-500/50 shadow-2xl">
@@ -102,30 +105,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                   {platformName}
                 </span>
              </h1>
-             <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto md:mx-0 border-r-4 border-orange-500 pr-4">
+             {/* Updated text color for better contrast */}
+             <p className="text-slate-300 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto md:mx-0 border-r-4 border-orange-500 pr-4">
                 {landingSubtitle}
              </p>
           </div>
 
-          <div className="hidden md:flex gap-4 opacity-70">
-             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+          <div className="hidden md:flex gap-4 opacity-90">
+             <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20">
                 <span className="text-amber-400">★</span>
-                <span className="text-slate-300 text-xs font-bold">تميز أكاديمي</span>
+                <span className="text-slate-200 text-xs font-bold">تميز أكاديمي</span>
              </div>
-             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+             <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20">
                 <span className="text-amber-400">🛡️</span>
-                <span className="text-slate-300 text-xs font-bold">محتوى محمي</span>
+                <span className="text-slate-200 text-xs font-bold">محتوى محمي</span>
              </div>
-             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+             <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20">
                 <span className="text-amber-400">🤖</span>
-                <span className="text-slate-300 text-xs font-bold">ذكاء اصطناعي</span>
+                <span className="text-slate-200 text-xs font-bold">ذكاء اصطناعي</span>
              </div>
           </div>
         </div>
 
         {/* Left Side: Login Card (Royal Style) */}
         <div className="w-full max-w-md animate-fadeIn delay-100 order-1 md:order-2">
-           <div className="bg-[#1e293b]/80 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-2xl border border-white/10 relative overflow-hidden group">
+           <div className="bg-[#1e293b]/90 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-2xl border border-white/10 relative overflow-hidden group">
               
               {/* Card Glow Effect */}
               <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50"></div>
@@ -133,7 +137,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
               <div className="space-y-8 relative z-10">
                  <div className="text-center">
                     <h3 className="text-2xl font-black text-white mb-2">تسجيل الدخول</h3>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">اختر نوع الحساب للمتابعة</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-widest">اختر نوع الحساب للمتابعة</p>
                  </div>
 
                  {/* Role Selection - Premium Buttons */}
@@ -149,7 +153,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                         className={`flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-300 ${
                           activeRole === role.id 
                             ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-orange-900/20 scale-100' 
-                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                         }`}
                       >
                         <span className="text-lg mb-1">{role.icon}</span>
@@ -164,7 +168,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                        <input 
                          type={activeRole === 'parent' ? 'tel' : 'text'}
                          placeholder={getPlaceholder()}
-                         className="w-full px-6 py-5 bg-[#0f172a] border border-slate-700/50 focus:border-amber-500/50 rounded-2xl font-bold text-lg text-center outline-none transition-all text-white placeholder:text-slate-600 focus:shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+                         aria-label="Login Credential"
+                         className="w-full px-6 py-5 bg-[#0f172a] border border-slate-700/50 focus:border-amber-500/50 rounded-2xl font-bold text-lg text-center outline-none transition-all text-white placeholder:text-slate-500 focus:shadow-[0_0_20px_rgba(245,158,11,0.1)]"
                          value={credential}
                          onChange={e => setCredential(e.target.value)}
                          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
@@ -218,7 +223,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                       <input 
                         type="tel" 
                         placeholder="رقم الهاتف" 
-                        className="w-full px-6 py-4 bg-slate-50 rounded-2xl font-black text-center text-lg outline-none border-2 border-transparent focus:border-indigo-600"
+                        aria-label="Phone Number"
+                        className="w-full px-6 py-4 bg-slate-50 rounded-2xl font-black text-center text-lg outline-none border-2 border-transparent focus:border-indigo-600 text-slate-900"
                         value={retrievePhone}
                         onChange={e => setRetrievePhone(e.target.value)}
                       />
@@ -260,3 +266,4 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
 };
 
 export default LandingPage;
+    

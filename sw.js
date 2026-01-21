@@ -1,17 +1,20 @@
 
-const CACHE_NAME = 'mathmaster-pro-v6';
+const CACHE_NAME = 'mathmaster-pro-v7';
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
+  '/',
+  '/index.html',
+  '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap',
-  'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css'
+  'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css',
+  'https://cdn.tailwindcss.com',
+  'https://esm.sh/tldraw@2.4.4/tldraw.css'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      console.log('Caching assets...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -27,23 +30,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// استراتيجية النقل الذكي
 self.addEventListener('fetch', (event) => {
-  // للطلبات الملاحية (فتح التطبيق)، نحاول الشبكة أولاً
+  // Navigation requests (HTML pages) - Try Network first, fall back to Cache
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('./index.html');
+        return caches.match('/index.html') || caches.match('/');
       })
     );
     return;
   }
 
-  // لباقي الملفات (الصور، الخطوط)، الكاش أولاً لتسريع الأداء
+  // Static assets - Cache first, then Network
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
-      return fetch(event.request);
+      return fetch(event.request).then(response => {
+        // Cache external assets dynamically if successful (optional, risky for huge files)
+        // For now, simple return
+        return response;
+      });
     })
   );
 });
+    

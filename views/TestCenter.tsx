@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Student, Year, Group, Quiz, Assignment, PlatformSettings } from '../types';
 import { generateQuizFromContent } from '../services/geminiService';
 import InteractiveBoard from '../components/InteractiveBoard';
+import { getFirebaseInitError, db } from '../firebaseConfig';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 
 interface TestCenterProps {
   students: Student[];
@@ -19,6 +21,7 @@ interface TestCenterProps {
 const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizzes, assignments, settings, onMockData, onEnterSimulation, addToast }) => {
   const [isAITesting, setIsAITesting] = useState(false);
   const [showBoardTest, setShowBoardTest] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<{status: 'idle' | 'loading' | 'success' | 'error', message: string}>({ status: 'idle', message: '' });
 
   const generateMockData = () => {
     const mockYears: Year[] = [
@@ -91,23 +94,94 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
     }
   };
 
+  // --- New Diagnostic Function ---
+  const runDiagnostics = async () => {
+      setDiagnosticResult({ status: 'loading', message: 'جاري فحص الاتصال...' });
+      
+      // 1. Check Initialization Error
+      const initErr = getFirebaseInitError();
+      if (initErr) {
+          setDiagnosticResult({ 
+              status: 'error', 
+              message: `فشل التهيئة الأولية (Init Error):\n${initErr}\n\nتأكد من صحة مفاتيح API في الكود.` 
+          });
+          return;
+      }
+
+      if (!db) {
+          setDiagnosticResult({ status: 'error', message: 'كائن قاعدة البيانات (DB Object) غير موجود. التطبيق يعمل في وضع الأوفلاين.' });
+          return;
+      }
+
+      // 2. Try Real Connection
+      try {
+          // Attempt to read a non-existent collection just to check connectivity/auth
+          await getDocs(collection(db, '_diagnostics_check_'));
+          
+          // Attempt to write (if rules allow, or fails with permission-denied which means connected)
+          // We expect this to work if rules are open, or fail with 'permission-denied' if connected but restricted.
+          // Either way, it confirms connection to Google servers.
+          
+          setDiagnosticResult({ 
+              status: 'success', 
+              message: 'الاتصال ناجح! ✅\nالتطبيق متصل بسيرفرات Firebase Firestore بشكل سليم.' 
+          });
+      } catch (error: any) {
+          let errorMsg = error.message;
+          let tip = "";
+
+          if (error.code === 'permission-denied') {
+              errorMsg = "تم الاتصال ولكن تم رفض الصلاحية (Permission Denied).";
+              tip = "تأكد من إعدادات Firestore Rules في الكونسول لتكون:\nallow read, write: if true; (للتجربة)";
+          } else if (error.code === 'unavailable') {
+              errorMsg = "الخدمة غير متاحة (Offline).";
+              tip = "تأكد من اتصال الإنترنت.";
+          } else if (errorMsg.includes("project")) {
+              tip = "تأكد من أن projectId في الكود يطابق الموجود في Firebase Console.";
+          }
+
+          setDiagnosticResult({ 
+              status: 'error', 
+              message: `فشل الاتصال المباشر:\nCode: ${error.code}\nMessage: ${errorMsg}\n\nنصيحة: ${tip}` 
+          });
+      }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 md:space-y-12 animate-slideUp pb-24 text-right px-2 md:px-0" dir="rtl">
       
       {/* Database Inspector Header */}
-      <div className="bg-emerald-900 p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
+      <div className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
          <div className="relative z-10 space-y-2">
-            <h2 className="text-3xl font-black">فحص قاعدة البيانات 🔍</h2>
-            <p className="text-emerald-200 font-bold text-sm">تأكد من وجود بياناتك في السحابة (Firebase) الآن.</p>
+            <h2 className="text-3xl font-black text-white">فحص النظام 🔧</h2>
+            <p className="text-slate-400 font-bold text-sm">أدوات للمطورين للتأكد من سلامة الاتصال والبيانات.</p>
          </div>
-         <div className="relative z-10 bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20 text-center min-w-[200px]">
-            <p className="text-xs font-bold text-emerald-300 uppercase tracking-widest mb-1">حالة الاتصال</p>
-            <p className="text-xl font-black flex items-center justify-center gap-2">
-               <span className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
-               متصل بـ Firebase
-            </p>
+         
+         <div className="relative z-10 flex gap-3">
+             <button 
+                onClick={runDiagnostics}
+                className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-2xl font-black text-xs transition-all border border-white/20 flex items-center gap-2"
+             >
+                {diagnosticResult.status === 'loading' ? <span className="animate-spin">↻</span> : <span>📡</span>}
+                <span>تشخيص الاتصال</span>
+             </button>
          </div>
       </div>
+
+      {/* Diagnostic Result Panel */}
+      {diagnosticResult.status !== 'idle' && (
+          <div className={`p-6 rounded-[2.5rem] border-2 animate-fadeIn ${
+              diagnosticResult.status === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
+              diagnosticResult.status === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+              <h4 className="font-black text-lg mb-2 flex items-center gap-2">
+                  {diagnosticResult.status === 'success' ? '✅ نتيجة الفحص: متصل' : diagnosticResult.status === 'error' ? '❌ نتيجة الفحص: فشل' : '⏳ جاري الفحص...'}
+              </h4>
+              <pre className="text-xs font-mono font-bold whitespace-pre-wrap bg-white/50 p-4 rounded-xl border border-black/5" dir="ltr">
+                  {diagnosticResult.message}
+              </pre>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          {[
@@ -120,14 +194,14 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
               <span className="text-4xl mb-2">{stat.icon}</span>
               <h4 className="font-black text-gray-800 text-sm">{stat.label}</h4>
               <p className={`text-3xl font-black ${stat.color}`}>{stat.count}</p>
-              <p className="text-[10px] text-gray-400 font-bold">مستند محفوظ</p>
+              <p className="text-[10px] text-gray-400 font-bold">مستند محلي/سحابي</p>
            </div>
          ))}
       </div>
 
       <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-lg space-y-6">
          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-            <span>🕵️‍♂️</span> آخر البيانات المسجلة في السحابة
+            <span>🕵️‍♂️</span> عينة من البيانات الحالية
          </h3>
          <div className="overflow-x-auto">
             <table className="w-full text-right text-sm">
@@ -140,12 +214,12 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
                   </tr>
                </thead>
                <tbody className="font-bold text-slate-700">
-                  {quizzes.slice(-3).map(q => (
+                  {quizzes.slice(-2).map(q => (
                      <tr key={q.id} className="border-b border-slate-50">
                         <td className="p-4 text-amber-600">اختبار</td>
                         <td className="p-4">{q.title}</td>
                         <td className="p-4 font-mono text-xs text-slate-400">{q.id}</td>
-                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
+                        <td className="p-4 text-center"><span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px]">متاح</span></td>
                      </tr>
                   ))}
                   {groups.slice(-2).map(g => (
@@ -153,31 +227,20 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
                         <td className="p-4 text-indigo-600">مجموعة</td>
                         <td className="p-4">{g.name}</td>
                         <td className="p-4 font-mono text-xs text-slate-400">{g.id}</td>
-                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
-                     </tr>
-                  ))}
-                  {students.slice(-2).map(s => (
-                     <tr key={s.id} className="border-b border-slate-50">
-                        <td className="p-4 text-blue-600">طالب</td>
-                        <td className="p-4">{s.name}</td>
-                        <td className="p-4 font-mono text-xs text-slate-400">{s.id}</td>
-                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
+                        <td className="p-4 text-center"><span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px]">متاح</span></td>
                      </tr>
                   ))}
                </tbody>
             </table>
          </div>
-         <p className="text-center text-xs text-slate-400 font-bold mt-4">
-            * هذه البيانات تم جلبها مباشرة من قاعدة البيانات الحية. إذا رأيتها هنا، فهي موجودة في Firebase Console.
-         </p>
       </div>
 
-      {/* --- Existing Sandbox Section --- */}
+      {/* --- Sandbox Section --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-12 pt-12 border-t border-slate-200">
          <div className="lg:col-span-1 space-y-6 md:space-y-8">
             <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-lg">
-               <h3 className="text-lg font-black mb-2">أدوات المطور 🛠️</h3>
-               <p className="text-xs text-slate-400 mb-6">استخدم هذه الأدوات لملء قاعدة البيانات ببيانات وهمية للتجربة.</p>
+               <h3 className="text-lg font-black mb-2">أدوات التوليد الوهمي 🛠️</h3>
+               <p className="text-xs text-slate-400 mb-6">توليد بيانات وهمية للتجربة فقط (تعمل محلياً).</p>
                <button onClick={generateMockData} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
                   <span>توليد بيانات تجريبية</span>
                   <span>🤖</span>
