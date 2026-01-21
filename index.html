@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
   <head>
@@ -9,25 +8,42 @@
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="المحترف رياضيات" />
+    <meta name="apple-mobile-web-app-title" content="المحترف" />
     
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" />
 
+    <!-- Tldraw CSS -->
+    <link rel="stylesheet" href="https://esm.sh/tldraw@2.4.4/tldraw.css">
+
+    <style>
+      html, body {
+        overscroll-behavior-y: contain;
+      }
+    </style>
+
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts: Cairo, Tajawal, Almarai, El Messiri -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&family=Cairo:wght@300;400;600;700;900&family=El+Messiri:wght@400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    
-    <!-- مكتبة مسح الباركود -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
+    <script>
+      // Polyfill for libraries expecting Node.js environment
+      window.process = {
+        env: {
+          NODE_ENV: 'production'
+        }
+      };
+    </script>
+
     <style>
       :root {
         --primary: #0f172a;
@@ -59,43 +75,18 @@
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.4);
       }
-      .hero-gradient {
-        background: radial-gradient(circle at top right, #1e293b, #0f172a);
-      }
       .math-pattern {
         background-image: radial-gradient(circle at 2px 2px, rgba(59, 130, 246, 0.05) 1px, transparent 0);
         background-size: 32px 32px;
       }
-      .animate-float {
-        animation: float 6s ease-in-out infinite;
-      }
-      @keyframes float {
-        0%, 100% { transform: translateY(0) rotate(0deg); }
-        50% { transform: translateY(-15px) rotate(2deg); }
-      }
-      .btn-premium {
-        background: linear-gradient(135deg, #3b82f6, #2563eb);
-        color: white;
-        border-radius: 1.5rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.3);
-      }
-      .btn-premium:hover {
-        box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.5);
-        transform: scale(1.02);
-      }
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       
-      /* تحسين عرض الكاميرا */
-      #qr-reader video {
-        border-radius: 2rem !important;
-        object-fit: cover !important;
+      /* تخصيص سبورة tldraw لتناسب طابع المنصة */
+      .tl-container {
+        background-color: #f8fafc !important;
       }
-      #qr-reader {
-        border: none !important;
-      }
-
+      
       @media (display-mode: standalone) {
         .glass-nav { padding-top: env(safe-area-inset-top); }
         main { padding-bottom: env(safe-area-inset-bottom); }
@@ -104,13 +95,17 @@
   <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+    "tldraw": "https://esm.sh/tldraw@2.4.4?deps=react@18.2.0,react-dom@18.2.0",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
+    "firebase/storage": "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
@@ -122,7 +117,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').then(reg => {
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => {
             console.log('MathMaster PWA Active:', reg.scope);
           }).catch(err => {
             console.log('SW Registration failed:', err);

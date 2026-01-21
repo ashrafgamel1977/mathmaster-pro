@@ -14,6 +14,14 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
   const [solution, setSolution] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  
+  // New: Grade Selection
+  const [selectedYear, setSelectedYear] = useState('الثالث الثانوي'); // Default
+  const YEARS = [
+    'الأول الإعدادي', 'الثاني الإعدادي', 'الثالث الإعدادي',
+    'الأول الثانوي', 'الثاني الثانوي', 'الثالث الثانوي'
+  ];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -59,7 +67,8 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
     setSolution(null);
     try {
       const imageData = imagePreview ? { data: imagePreview, mimeType: 'image/jpeg' } : undefined;
-      const res = await solveMathProblem(input, imageData, notation as MathNotation);
+      // Pass the selectedYear to enforce curriculum
+      const res = await solveMathProblem(input, imageData, notation as MathNotation, selectedYear);
       setSolution(res);
     } catch (e) {
       alert('فشل في تحليل المسألة. يرجى التأكد من وضوح الصورة والاتصال بالإنترنت.');
@@ -77,6 +86,8 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
     }
   };
 
+  const isLatex = input.includes('$') || input.includes('\\');
+
   return (
     <div className="max-w-4xl mx-auto space-y-10 animate-slideUp pb-24 text-right px-4 md:px-0" dir="rtl">
       {/* Royal Lab Header */}
@@ -85,11 +96,11 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
         <div className="relative z-10 space-y-6">
            <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 backdrop-blur-2xl rounded-full border border-white/10">
               <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse shadow-[0_0_10px_#60a5fa]"></span>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">MathMaster Intelligence Pro v2.0</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">Egyptian Math Engine v3.0</span>
            </div>
-           <h2 className="text-4xl md:text-7xl font-black tracking-tighter leading-none">مُحلل المسائل <br/> <span className="text-blue-400">الذكي المتطور</span> 🧠</h2>
+           <h2 className="text-4xl md:text-7xl font-black tracking-tighter leading-none">مُحلل المسائل <br/> <span className="text-blue-400">حسب المنهج المصري</span> 🇪🇬</h2>
            <p className="text-slate-400 font-bold text-sm md:text-xl max-w-xl leading-relaxed">
-             الآن يدعم الإدخال الصوتي وتحليل الصور المتقدم. تحدث بمسألتك أو ارفع صورة ليقوم Gemini 3 Pro بحلها فوراً.
+             يقوم الذكاء الاصطناعي بحل المسائل بالخطوات والقوانين المعتمدة من وزارة التربية والتعليم، مع مراعاة المرحلة الدراسية بدقة.
            </p>
         </div>
       </div>
@@ -98,13 +109,43 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
         <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/10 rounded-full -ml-16 -mt-16 blur-3xl"></div>
         
         <div className="space-y-6 relative z-10">
+           {/* Year Selection */}
+           <div className="flex justify-end">
+              <div className="bg-white/10 p-1.5 rounded-2xl flex items-center gap-2 border border-white/10">
+                 <span className="text-white text-[10px] font-bold px-2">اختر المرحلة:</span>
+                 <select 
+                   value={selectedYear} 
+                   onChange={(e) => setSelectedYear(e.target.value)}
+                   className="bg-indigo-950 text-white px-4 py-2 rounded-xl text-xs font-black outline-none border-none cursor-pointer hover:bg-indigo-900 transition-colors"
+                 >
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                 </select>
+              </div>
+           </div>
+
            <div className="relative group">
               <textarea 
-                placeholder="اكتب المسألة، أو ارفع صورة، أو اضغط على الميكروفون للتحدث..."
+                placeholder={`اكتب المسألة هنا... (سيتم الحل وفق منهج ${selectedYear})`}
                 className="w-full p-8 md:p-12 bg-white/5 border-2 border-white/10 focus:border-blue-500 rounded-[3rem] font-bold text-lg md:text-2xl outline-none min-h-[200px] md:min-h-[280px] transition-all shadow-inner text-white placeholder:text-slate-600"
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                dir="ltr"
+                style={{ textAlign: 'right' }}
               />
+              
+              {/* LaTeX Preview Overlay */}
+              {isLatex && (
+                <div className="absolute top-6 left-6 p-4 bg-slate-950/80 backdrop-blur-md rounded-3xl border border-white/10 max-w-[200px] md:max-w-[300px] shadow-2xl z-20 animate-fadeIn hidden sm:block">
+                   <div className="flex justify-between items-center mb-2 border-b border-white/10 pb-1">
+                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">معاينة LaTeX</span>
+                      <span className="text-[10px]">👁️</span>
+                   </div>
+                   <div className="max-h-32 overflow-y-auto no-scrollbar text-white text-sm font-medium">
+                      <MathRenderer content={input} inline />
+                   </div>
+                </div>
+              )}
+
               <div className="absolute bottom-8 left-8 flex gap-3">
                  <button 
                    onClick={toggleListening}
@@ -129,12 +170,12 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
                 {isLoading ? (
                   <>
                     <span className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></span>
-                    <span>جاري التفكير الرياضي...</span>
+                    <span>جاري التفكير بالمنهج المصري...</span>
                   </>
                 ) : (
                   <>
                     <span className="text-3xl">✨</span>
-                    <span>بدء التحليل والحل الآن</span>
+                    <span>حل المسألة (Egyptian AI)</span>
                   </>
                 )}
               </button>
@@ -162,7 +203,7 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
               <div className="flex items-center gap-6">
                  <div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-200">💡</div>
                  <div>
-                    <h3 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">تقرير الحل المفصل</h3>
+                    <h3 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">خطوات الحل (منهج {selectedYear})</h3>
                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Generated by MathMaster AI Engine</p>
                  </div>
               </div>
@@ -176,7 +217,7 @@ const AISolver: React.FC<AISolverProps> = ({ notation = 'arabic' }) => {
            <div className="pt-10 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
               <div className="flex items-center gap-3">
                  <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                 <p className="text-[11px] font-bold text-slate-400 italic">هذا الحل تم توليده آلياً لأغراض تعليمية، يرجى استخدامه لفهم الخطوات.</p>
+                 <p className="text-[11px] font-bold text-slate-400 italic">هذا الحل تم توليده آلياً بناءً على قواعد المناهج المصرية.</p>
               </div>
               <button onClick={() => { setSolution(null); setInput(''); setImagePreview(null); }} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-black transition-all">حل مسألة أخرى</button>
            </div>

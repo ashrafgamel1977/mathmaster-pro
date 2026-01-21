@@ -11,6 +11,7 @@ interface SectionsProps {
 const Sections: React.FC<SectionsProps> = ({ sections, onUpdateSections }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSection, setEditingSection] = useState<CustomSection | null>(null);
+  const [deletingSectionId, setDeletingSectionId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Omit<CustomSection, 'id'>>({
     title: '',
@@ -57,9 +58,14 @@ const Sections: React.FC<SectionsProps> = ({ sections, onUpdateSections }) => {
     setShowAddModal(true);
   };
 
-  const deleteSection = (id: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا القسم؟')) {
-      onUpdateSections(sections.filter(s => s.id !== id));
+  const requestDelete = (id: string) => {
+    setDeletingSectionId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deletingSectionId) {
+      onUpdateSections(sections.filter(s => s.id !== deletingSectionId));
+      setDeletingSectionId(null);
     }
   };
 
@@ -68,6 +74,8 @@ const Sections: React.FC<SectionsProps> = ({ sections, onUpdateSections }) => {
       s.id === id ? { ...s, isVisibleToStudents: !s.isVisibleToStudents } : s
     ));
   };
+
+  const sectionToDelete = sections.find(s => s.id === deletingSectionId);
 
   return (
     <div className="space-y-10 animate-slideUp text-right pb-24" dir="rtl">
@@ -98,7 +106,7 @@ const Sections: React.FC<SectionsProps> = ({ sections, onUpdateSections }) => {
                   className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-all"
                 >✎</button>
                 <button 
-                  onClick={() => deleteSection(section.id)} 
+                  onClick={() => requestDelete(section.id)} 
                   className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 flex items-center justify-center transition-all"
                 >🗑️</button>
               </div>
@@ -189,6 +197,27 @@ const Sections: React.FC<SectionsProps> = ({ sections, onUpdateSections }) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {deletingSectionId && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+           <div className="bg-white w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl relative animate-slideUp text-center space-y-6">
+              <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-4xl mb-4 shadow-sm">
+                 🗑️
+              </div>
+              <div>
+                 <h3 className="text-2xl font-black text-slate-800">حذف القسم؟</h3>
+                 <p className="text-slate-500 font-bold text-sm mt-2">
+                    هل أنت متأكد من رغبتك في حذف القسم <span className="text-slate-800">"{sectionToDelete?.title}"</span>؟ <br/>
+                    <span className="text-rose-500 text-xs">لا يمكن استرجاع البيانات بعد الحذف.</span>
+                 </p>
+              </div>
+              <div className="flex gap-4 pt-2">
+                 <button onClick={confirmDelete} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">نعم، احذف</button>
+                 <button onClick={() => setDeletingSectionId(null)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">إلغاء</button>
+              </div>
+           </div>
         </div>
       )}
     </div>

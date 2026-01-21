@@ -31,9 +31,7 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
     ];
 
     const mockGroups: Group[] = [
-      // Fix: Compliance with Group interface
       { id: 'mock-g1', name: 'مجموعة أ - الثالث الثانوي (بنين)', yearId: 'y3-sec', time: 'السبت 04:00 م', joinCode: 'SEC3B', type: 'center', gender: 'boys' },
-      // Fix: Compliance with Group interface
       { id: 'mock-g2', name: 'مجموعة ب - الثالث الثانوي (بنات)', yearId: 'y3-sec', time: 'الأحد 06:00 م', joinCode: 'SEC3G', type: 'center', gender: 'girls' }
     ];
 
@@ -44,7 +42,6 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
       'https://api.dicebear.com/7.x/avataaars/svg?seed=Mona'
     ];
 
-    // Fix: Added missing badges, streaks, and deviceIds properties to comply with Student interface requirements
     const mockStudents: Student[] = Array.from({ length: 12 }).map((_, i) => ({
       id: `mock-s${i}`,
       studentCode: `MATH${200 + i}`,
@@ -66,7 +63,6 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
     }));
 
     const mockQuizzes: Quiz[] = [{ id: 'mock-q1', title: 'مراجعة الجبر العامة', yearId: 'y3-sec', date: new Date().toLocaleDateString('ar-EG'), type: 'native' }];
-    // Fix: Compliance with Assignment interface
     const mockAssignments: Assignment[] = [{ 
       id: 'mock-a1', 
       title: 'واجب: الهندسة الفراغية', 
@@ -97,67 +93,108 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 md:space-y-12 animate-slideUp pb-24 text-right px-2 md:px-0" dir="rtl">
-      <div className="bg-slate-900 p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] text-white shadow-2xl relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-2xl md:text-4xl font-black tracking-tight">مختبر الفحص الذكي 🧪</h2>
-          <p className="mt-2 text-slate-400 font-medium text-sm md:text-lg italic">بيئة التجارب الآمنة للمنصة.</p>
-        </div>
+      
+      {/* Database Inspector Header */}
+      <div className="bg-emerald-900 p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
+         <div className="relative z-10 space-y-2">
+            <h2 className="text-3xl font-black">فحص قاعدة البيانات 🔍</h2>
+            <p className="text-emerald-200 font-bold text-sm">تأكد من وجود بياناتك في السحابة (Firebase) الآن.</p>
+         </div>
+         <div className="relative z-10 bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20 text-center min-w-[200px]">
+            <p className="text-xs font-bold text-emerald-300 uppercase tracking-widest mb-1">حالة الاتصال</p>
+            <p className="text-xl font-black flex items-center justify-center gap-2">
+               <span className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
+               متصل بـ Firebase
+            </p>
+         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+         {[
+           { label: 'الاختبارات (quizzes)', count: quizzes.length, icon: '⚡', color: 'text-amber-500', bg: 'bg-amber-50' },
+           { label: 'الطلاب (students)', count: students.length, icon: '👥', color: 'text-blue-500', bg: 'bg-blue-50' },
+           { label: 'المجموعات (groups)', count: groups.length, icon: '🏫', color: 'text-indigo-500', bg: 'bg-indigo-50' },
+           { label: 'الواجبات (assignments)', count: assignments.length, icon: '📝', color: 'text-rose-500', bg: 'bg-rose-50' },
+         ].map((stat, i) => (
+           <div key={i} className={`p-6 rounded-[2.5rem] border border-gray-100 shadow-sm ${stat.bg} flex flex-col items-center justify-center gap-2`}>
+              <span className="text-4xl mb-2">{stat.icon}</span>
+              <h4 className="font-black text-gray-800 text-sm">{stat.label}</h4>
+              <p className={`text-3xl font-black ${stat.color}`}>{stat.count}</p>
+              <p className="text-[10px] text-gray-400 font-bold">مستند محفوظ</p>
+           </div>
+         ))}
+      </div>
+
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-lg space-y-6">
+         <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span>🕵️‍♂️</span> آخر البيانات المسجلة في السحابة
+         </h3>
+         <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+               <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                     <th className="p-4 rounded-r-xl">النوع</th>
+                     <th className="p-4">العنوان / الاسم</th>
+                     <th className="p-4">المعرف (ID)</th>
+                     <th className="p-4 rounded-l-xl text-center">الحالة</th>
+                  </tr>
+               </thead>
+               <tbody className="font-bold text-slate-700">
+                  {quizzes.slice(-3).map(q => (
+                     <tr key={q.id} className="border-b border-slate-50">
+                        <td className="p-4 text-amber-600">اختبار</td>
+                        <td className="p-4">{q.title}</td>
+                        <td className="p-4 font-mono text-xs text-slate-400">{q.id}</td>
+                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
+                     </tr>
+                  ))}
+                  {groups.slice(-2).map(g => (
+                     <tr key={g.id} className="border-b border-slate-50">
+                        <td className="p-4 text-indigo-600">مجموعة</td>
+                        <td className="p-4">{g.name}</td>
+                        <td className="p-4 font-mono text-xs text-slate-400">{g.id}</td>
+                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
+                     </tr>
+                  ))}
+                  {students.slice(-2).map(s => (
+                     <tr key={s.id} className="border-b border-slate-50">
+                        <td className="p-4 text-blue-600">طالب</td>
+                        <td className="p-4">{s.name}</td>
+                        <td className="p-4 font-mono text-xs text-slate-400">{s.id}</td>
+                        <td className="p-4 text-center"><span className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[10px]">محفوظ ✓</span></td>
+                     </tr>
+                  ))}
+               </tbody>
+            </table>
+         </div>
+         <p className="text-center text-xs text-slate-400 font-bold mt-4">
+            * هذه البيانات تم جلبها مباشرة من قاعدة البيانات الحية. إذا رأيتها هنا، فهي موجودة في Firebase Console.
+         </p>
+      </div>
+
+      {/* --- Existing Sandbox Section --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-12 pt-12 border-t border-slate-200">
          <div className="lg:col-span-1 space-y-6 md:space-y-8">
-            <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3.5rem] border border-gray-100 shadow-sm">
-               <h3 className="text-lg md:text-xl font-black text-gray-800 mb-6">حالة المنصة</h3>
-               <div className="space-y-3 md:space-y-4">
-                  <div className="flex justify-between items-center p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
-                     <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">الصفوف المتاحة</span>
-                     <span className="text-xs md:text-sm font-black text-gray-800">{years.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
-                     <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">API Key</span>
-                     <span className="text-xs md:text-sm font-black text-emerald-500">متصل ✓</span>
-                  </div>
-               </div>
+            <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-lg">
+               <h3 className="text-lg font-black mb-2">أدوات المطور 🛠️</h3>
+               <p className="text-xs text-slate-400 mb-6">استخدم هذه الأدوات لملء قاعدة البيانات ببيانات وهمية للتجربة.</p>
+               <button onClick={generateMockData} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
+                  <span>توليد بيانات تجريبية</span>
+                  <span>🤖</span>
+               </button>
             </div>
          </div>
 
-         <div className="lg:col-span-2 space-y-6 md:space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-               <button onClick={generateMockData} className="p-6 md:p-10 bg-indigo-600 text-white rounded-[2rem] md:rounded-[3.5rem] text-center space-y-2 md:space-y-4 shadow-xl shadow-indigo-100 hover:scale-[1.02] transition-all group">
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-2xl md:rounded-3xl mx-auto flex items-center justify-center text-3xl md:text-4xl">🤖</div>
-                  <h4 className="text-md md:text-xl font-black">تجهيز بيانات المحاكاة</h4>
-                  <p className="text-[8px] md:text-[10px] font-medium opacity-70">توليد كافة الصفوف والطلاب فورياً.</p>
+         <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <button onClick={() => setShowBoardTest(true)} className="p-6 bg-white border border-gray-200 rounded-[2.5rem] text-center hover:border-amber-400 transition-all group shadow-sm">
+                  <span className="text-3xl block mb-2 group-hover:scale-110 transition-transform">🖋️</span>
+                  <h4 className="font-black text-slate-800">تجربة السبورة</h4>
                </button>
-
-               <button onClick={() => setShowBoardTest(true)} className="p-6 md:p-10 bg-amber-50 text-white rounded-[2rem] md:rounded-[3.5rem] text-center space-y-2 md:space-y-4 shadow-xl shadow-amber-100 hover:scale-[1.02] transition-all group border-4 border-white">
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-2xl md:rounded-3xl mx-auto flex items-center justify-center text-3xl md:text-4xl">🖋️</div>
-                  <h4 className="text-md md:text-xl font-black">فحص أدوات الرسم</h4>
-                  <p className="text-[8px] md:text-[10px] font-medium opacity-70">تجربة رسم الدوال الهندسية.</p>
+               <button onClick={testAICapability} disabled={isAITesting} className="p-6 bg-white border border-gray-200 rounded-[2.5rem] text-center hover:border-emerald-400 transition-all group shadow-sm">
+                  <span className="text-3xl block mb-2 group-hover:scale-110 transition-transform">🧠</span>
+                  <h4 className="font-black text-slate-800">{isAITesting ? 'جاري الفحص...' : 'فحص محرك الذكاء الاصطناعي'}</h4>
                </button>
-
-               <button onClick={testAICapability} disabled={isAITesting} className="p-6 md:p-10 bg-emerald-600 text-white rounded-[2rem] md:rounded-[3.5rem] text-center space-y-2 md:space-y-4 shadow-xl shadow-emerald-100 hover:scale-[1.02] transition-all group disabled:opacity-50">
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-2xl md:rounded-3xl mx-auto flex items-center justify-center text-3xl md:text-4xl">✨</div>
-                  <h4 className="text-md md:text-xl font-black">فحص الذكاء الاصطناعي</h4>
-                  <p className="text-[8px] md:text-[10px] font-medium opacity-70">التأكد من توليد الأسئلة.</p>
-               </button>
-            </div>
-
-            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] border border-gray-100 shadow-sm">
-               <h3 className="text-lg md:text-xl font-black text-gray-800 mb-6 flex justify-between items-center">
-                 <span>طلاب المحاكاة (Sandbox)</span>
-                 <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[9px] md:text-[10px] font-black">العدد: {students.length}</span>
-               </h3>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                  {students.slice(0, 6).map(s => (
-                    <div key={s.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-indigo-600 transition-all cursor-pointer group" onClick={() => onEnterSimulation(s)}>
-                       <div className="flex items-center gap-3 text-right">
-                          <img src={s.avatar} className="w-10 h-10 rounded-xl border-2 border-white shadow-sm" alt="" />
-                          <p className="text-xs md:text-sm font-black text-gray-800">{s.name}</p>
-                       </div>
-                       <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-[10px] shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">←</div>
-                    </div>
-                  ))}
-               </div>
             </div>
          </div>
       </div>

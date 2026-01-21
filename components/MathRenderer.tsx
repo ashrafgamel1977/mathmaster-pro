@@ -37,17 +37,18 @@ const MathRenderer: React.FC<MathRendererProps> = ({ content, inline = false, cl
               trust: true,
               strict: false,
               macros: {
-                "\\س": "s",
+                "\\س": "s", // Fallback macros just in case
                 "\\ص": "y",
                 "\\ع": "z",
-                "\\د": "d"
+                "\\د": "d",
+                "\\ن": "n"
               }
             });
             return (
               <span 
                 key={index} 
                 className={`${isDisplayMode ? "block my-6 py-2 overflow-x-auto no-scrollbar text-center" : "inline-block mx-1 align-middle"} math-content`}
-                style={{ fontSize: inline ? '1.15em' : '1.25em' }}
+                style={{ fontSize: inline ? '1.15em' : '1.25em', fontFamily: 'Cairo, sans-serif' }}
                 dangerouslySetInnerHTML={{ __html: html }} 
               />
             );

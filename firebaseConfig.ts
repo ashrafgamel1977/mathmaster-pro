@@ -1,29 +1,20 @@
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // ============================================================================
-// 🛑 منطقة التعديل: هنا تضع "المفتاح" الذي جلبته من موقع Firebase
+// ✅ تم ربط التطبيق بقاعدة البيانات الخاصة بك بنجاح
 // ============================================================================
 
 const PERMANENT_CONFIG = {
-  // 1. انسخ الـ apiKey من موقع Firebase وضعه هنا بدلاً من النص الموجود
-  apiKey: "AIzaSyD-YOUR_API_KEY_HERE", 
-  
-  // 2. انسخ الـ authDomain وضعه هنا
-  authDomain: "your-project-id.firebaseapp.com",
-  
-  // 3. انسخ الـ projectId وضعه هنا (مهم جداً)
-  projectId: "your-project-id",
-  
-  // 4. انسخ الـ storageBucket وضعه هنا
-  storageBucket: "your-project-id.appspot.com",
-  
-  // 5. انسخ الـ messagingSenderId وضعه هنا
-  messagingSenderId: "123456789",
-  
-  // 6. انسخ الـ appId وضعه هنا
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",
+  authDomain: "mathmaster-pri.firebaseapp.com",
+  projectId: "mathmaster-pri",
+  storageBucket: "mathmaster-pri.firebasestorage.app",
+  messagingSenderId: "784442354442",
+  appId: "1:784442354442:web:3760b6b9062420651228f3",
+  measurementId: "G-JK1YWQ8ZY7"
 };
 
 // ============================================================================
@@ -31,50 +22,56 @@ const PERMANENT_CONFIG = {
 // ============================================================================
 
 const getConfig = () => {
-  // استخدام البيانات المباشرة إذا تم تعديلها من قبل المبرمج
-  if (PERMANENT_CONFIG.apiKey && !PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
-    return PERMANENT_CONFIG;
-  }
-
-  // محاولة جلب الإعدادات من الذاكرة المؤقتة (للمعاينة السريعة)
-  try {
-    const stored = localStorage.getItem('math_firebase_config');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Config Error', e);
-  }
-
   return PERMANENT_CONFIG;
 };
 
 const config = getConfig();
 let app;
 let db: Firestore;
+let storage: FirebaseStorage;
 
-try {
-  app = initializeApp(config);
-  db = getFirestore(app);
-  console.log("Firebase Initialized with Project:", config.projectId);
-} catch (error) {
-  console.error("Firebase Init Error - تأكد من وضع مفاتيح الربط الصحيحة في ملف firebaseConfig.ts", error);
+const isConfigValid = config.apiKey && !config.apiKey.includes('YOUR_API_KEY');
+
+if (isConfigValid) {
+  try {
+    app = initializeApp(config);
+    
+    // Using standard getFirestore to avoid bundle mismatch issues
+    try {
+        db = getFirestore(app);
+    } catch (err) {
+        console.error("Firestore Init Error:", err);
+    }
+
+    try {
+      storage = getStorage(app);
+    } catch (storageError) {
+      console.warn("Storage service not available (Running with Database only).");
+    }
+    console.log("Firebase Initialized Successfully ✅");
+  } catch (error) {
+    console.error("Firebase Init Error ❌", error);
+  }
+} else {
+  console.log("⚠️ التطبيق يعمل في وضع المحاكاة (Demo Mode) لعدم وجود مفاتيح Firebase.");
 }
 
-export { db };
+export { db, storage };
 
-// دوال مساعدة للتحقق من الحالة
 export const isUsingDefaultConfig = () => {
   if (PERMANENT_CONFIG.apiKey && !PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
-    return false;
+    return false; // التطبيق يعمل أونلاين
   }
-  const stored = localStorage.getItem('math_firebase_config');
-  return !stored;
+  return true; 
 };
 
 export const saveConfig = (newConfig: any) => {
-  localStorage.setItem('math_firebase_config', JSON.stringify(newConfig));
-  window.location.reload();
+  try {
+    localStorage.setItem('math_firebase_config', JSON.stringify(newConfig));
+    window.location.reload();
+  } catch (e) {
+    console.error("Failed to save config", e);
+  }
 };
 
 export const resetConfig = () => {

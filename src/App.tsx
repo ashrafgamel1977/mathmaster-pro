@@ -13,7 +13,7 @@ import Dashboard from './views/Dashboard';
 import StudentPortal from './views/StudentPortal';
 import ParentPortal from './views/ParentPortal';
 import StudentList from './components/StudentList';
-import AssignmentsView from './views/AssignmentsView'; // Fixed import path
+import AssignmentsView from './views/Assignments';
 import QuizGenerator from './views/QuizGenerator';
 import LiveClass from './views/LiveClass';
 import FilesView from './views/Files';
@@ -507,8 +507,6 @@ const App: React.FC = () => {
             quizzes={quizzes}
             assignments={assignments}
             submissions={submissions}
-            results={results} // Passed results to Dashboard
-            groups={groups} // Passed groups to Dashboard
             settings={settings}
             onNavigate={setCurrentView}
             loggedUser={currentUser}
@@ -615,7 +613,7 @@ const App: React.FC = () => {
         return (
            <LiveClass 
             teacherName={settings.teacherName} settings={settings} 
-            educationalSources={educationalSources} years={years}
+            educationalSources={educationalSources}
             onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }} 
             onBroadcastToWhatsApp={() => addToast('تم التنبيه', 'info')} 
             onPostSummary={(src) => { persistData('educationalSources', src, 'save'); addToast('تم النشر', 'success'); }} 
@@ -654,7 +652,7 @@ const App: React.FC = () => {
         return (
           <ChatRoom 
             user={currentUser} messages={messages} years={years} students={students} notation={settings.mathNotation}
-            educationalSources={educationalSources} settings={settings}
+            educationalSources={educationalSources} 
             onSendMessage={(text, type, recId, audio) => {
               persistData('messages', { 
                 id: 'm'+Date.now(), text, type, recipientId: recId, audioData: audio, 
@@ -676,7 +674,7 @@ const App: React.FC = () => {
       case AppView.CALL_CENTER:
         return (
           <CallCenter 
-            inquiries={inquiries} callLogs={callLogs} students={students} teacherName={currentUser.name} settings={settings}
+            inquiries={inquiries} callLogs={callLogs} students={students} teacherName={currentUser.name}
             onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
             onAddCallLog={(l) => { persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save'); addToast('تم الحفظ', 'success'); }}
           />

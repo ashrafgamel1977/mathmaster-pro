@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { ParentInquiry, CallLog, Student } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ParentInquiry, CallLog, Student, PlatformSettings, AppView } from '../types';
 
 interface CallCenterProps {
   inquiries: ParentInquiry[];
@@ -9,12 +8,36 @@ interface CallCenterProps {
   onUpdateInquiry: (id: string, status: ParentInquiry['status']) => void;
   onAddCallLog: (log: Omit<CallLog, 'id'>) => void;
   teacherName: string;
+  settings?: PlatformSettings;
 }
 
-const CallCenter: React.FC<CallCenterProps> = ({ inquiries, callLogs, students, onUpdateInquiry, onAddCallLog, teacherName }) => {
-  const [activeTab, setActiveTab] = useState<'inquiries' | 'logs'>('inquiries');
+const CallCenter: React.FC<CallCenterProps> = ({ inquiries, callLogs, students, onUpdateInquiry, onAddCallLog, teacherName, settings }) => {
+  const [activeTab, setActiveTab] = useState<string>('inquiries');
   const [showLogModal, setShowLogModal] = useState(false);
   const [newLog, setNewLog] = useState({ studentId: '', parentName: '', note: '' });
+
+  const DEFAULT_TABS: { id: string; label: string; disabled?: boolean }[] = [
+    { id: 'inquiries', label: 'الطلبات الواردة' },
+    { id: 'logs', label: 'سجل المكالمات' }
+  ];
+
+  const tabs = useMemo(() => {
+    if (!settings?.featureConfig?.[AppView.CALL_CENTER]) return DEFAULT_TABS;
+    const config = settings.featureConfig[AppView.CALL_CENTER];
+    return DEFAULT_TABS.map(t => {
+        const conf = config.find(c => c.id === t.id);
+        if (conf) {
+            return { ...t, label: conf.label, disabled: !conf.enabled };
+        }
+        return t;
+    }).filter(t => !t.disabled);
+  }, [settings]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
+        setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   const getPriorityColor = (p: string) => {
     switch(p) {
@@ -40,14 +63,21 @@ const CallCenter: React.FC<CallCenterProps> = ({ inquiries, callLogs, students, 
               <p className="text-blue-200 font-bold text-sm md:text-lg">إدارة تواصل أولياء الأمور وحل المشكلات الأكاديمية.</p>
            </div>
            <div className="flex bg-white/5 backdrop-blur-md p-1 rounded-2xl border border-white/10">
-              <button onClick={() => setActiveTab('inquiries')} className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${activeTab === 'inquiries' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>الطلبات الواردة</button>
-              <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${activeTab === 'logs' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>سجل المكالمات</button>
+              {tabs.map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)} 
+                  className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
            </div>
         </div>
       </div>
 
-      {activeTab === 'inquiries' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {activeTab === 'inquiries' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
           {inquiries.map((inq) => (
             <div key={inq.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl hover:shadow-2xl transition-all group">
               <div className="flex justify-between items-start mb-6">
@@ -87,8 +117,10 @@ const CallCenter: React.FC<CallCenterProps> = ({ inquiries, callLogs, students, 
             </div>
           )}
         </div>
-      ) : (
-        <div className="bg-white rounded-[3.5rem] shadow-xl border border-slate-100 overflow-hidden">
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="bg-white rounded-[3.5rem] shadow-xl border border-slate-100 overflow-hidden animate-fadeIn">
            <div className="p-8 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-2xl font-black text-slate-800">سجل مكالمات المعلم 📝</h3>
               <button 

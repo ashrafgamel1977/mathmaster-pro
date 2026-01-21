@@ -1,5 +1,5 @@
 
-import { db } from '../firebaseConfig';
+import { db, storage } from '../firebaseConfig';
 import { 
   collection, 
   onSnapshot, 
@@ -9,81 +9,137 @@ import {
   updateDoc,
   query
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Helper to check if we should skip Firestore operations
-const shouldSkipOperation = () => {
-  if (!db) return true;
-  const projectId = db.app.options.projectId;
-  // Check for default/placeholder project IDs
-  return !projectId || 
-         projectId === 'your-project-id' || 
-         projectId.includes('YOUR_PROJECT_ID') ||
-         projectId.includes('your-project-id');
+// دالة التحقق من جاهزية قاعدة البيانات
+const isDbReady = () => {
+  if (!db) return false;
+  return true;
 };
 
-// دالة عامة للاستماع لأي مجموعة بيانات (Real-time)
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void, onError?: (error: any) => void) => {
   try {
-    if (!db) throw new Error("Database not initialized");
-    
-    // Safety check: if using default config, don't try to connect effectively
-    if (shouldSkipOperation()) {
-       console.warn(`Skipping subscription to ${collectionName} due to default/invalid config.`);
-       return () => {}; // Return empty unsubscribe
+    if (!isDbReady()) {
+       console.warn(`Database not ready. Skipping sync for: ${collectionName}`);
+       return () => {}; 
     }
 
     const q = query(collection(db, collectionName));
     return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data() }));
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       callback(data);
     }, (error) => {
-      console.error(`Error listening to ${collectionName}:`, error);
+      console.error(`Sync Error [${collectionName}]:`, error);
       if (onError) onError(error);
     });
   } catch (e) {
-    console.warn("Firebase subscribe skipped (Config might be missing)");
     if (onError) onError(e);
     return () => {};
   }
 };
 
-// إضافة أو تحديث مستند
 export const saveData = async (collectionName: string, data: any) => {
+  if (!isDbReady()) throw new Error("Firebase not configured");
   try {
-    if (!db) throw new Error("Database not initialized");
-    if (shouldSkipOperation()) throw new Error("Cannot save data with default configuration.");
-    
     const docRef = doc(db, collectionName, data.id);
     await setDoc(docRef, data, { merge: true });
   } catch (error) {
-    console.error(`Error saving to ${collectionName}:`, error);
+    console.error(`Save Error [${collectionName}]:`, error);
     throw error;
   }
 };
 
-// حذف مستند
 export const removeData = async (collectionName: string, id: string) => {
+  if (!isDbReady()) throw new Error("Firebase not configured");
   try {
-    if (!db) throw new Error("Database not initialized");
-    if (shouldSkipOperation()) throw new Error("Cannot delete data with default configuration.");
-
     await deleteDoc(doc(db, collectionName, id));
   } catch (error) {
-    console.error(`Error deleting from ${collectionName}:`, error);
+    console.error(`Delete Error [${collectionName}]:`, error);
     throw error;
   }
 };
 
-// تحديث جزئي لمستند
 export const updatePartialData = async (collectionName: string, id: string, updates: any) => {
+  if (!isDbReady()) throw new Error("Firebase not configured");
   try {
-    if (!db) throw new Error("Database not initialized");
-    if (shouldSkipOperation()) throw new Error("Cannot update data with default configuration.");
-
     const docRef = doc(db, collectionName, id);
     await updateDoc(docRef, updates);
   } catch (error) {
-    console.error(`Error updating ${collectionName}:`, error);
+    console.error(`Update Error [${collectionName}]:`, error);
     throw error;
+  }
+};
+
+// --- دالة ضغط الصور (لتقليل الحجم عند عدم وجود Storage) ---
+const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // الحفاظ على الأبعاد ضمن الحد المسموح
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // التحويل إلى JPEG مضغوط لتقليل الحجم
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+            resolve(event.target?.result as string); // Fallback
+        }
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
+// --- دالة رفع الملفات الذكية (New Smart Upload) ---
+export const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+  // 1. المحاولة الأولى: الرفع عبر Firebase Storage (الأفضل إذا كان مفعلاً)
+  if (storage) {
+    try {
+      // محاولة سريعة للرفع
+      const storageRef = ref(storage, path);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      return url;
+    } catch (error: any) {
+      console.warn("Storage upload failed or not enabled. Switching to Compressed Base64 fallback.");
+      // إذا فشل (بسبب عدم الترقية مثلاً)، ننتقل للخطة البديلة بصمت
+    }
+  }
+
+  // 2. المحاولة الثانية: الضغط والتحويل إلى Base64 (الحل المجاني البديل)
+  try {
+      // إذا كان الملف صورة، نقوم بضغطه لتوفير المساحة في قاعدة البيانات
+      if (file.type.startsWith('image/')) {
+          const compressed = await compressImage(file);
+          console.log("Image compressed successfully for Firestore storage.");
+          return compressed;
+      }
+      
+      // للملفات الأخرى (PDF وغيرها)، تحويل عادي
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      });
+  } catch (e) {
+      console.error("Compression failed", e);
+      throw e;
   }
 };

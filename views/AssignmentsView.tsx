@@ -14,7 +14,7 @@ interface AssignmentsViewProps {
   teacherName: string;
   notation: MathNotation;
   onAdd: (a: Assignment) => void;
-  onUpdate: (a: Assignment) => void;
+  onUpdate: (a: Assignment) => void; // New Prop for updating
   onDelete: (id: string) => void;
   onGrade: (submissionId: string, grade: number, feedback: string, correctedImg?: string) => void;
 }
@@ -27,8 +27,9 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
   const [gradingSub, setGradingSub] = useState<AssignmentSubmission | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'link' | 'file' | 'board'>('board');
   const [showBoard, setShowBoard] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(false); // Toggle preview mode
   
+  // AI Grading State
   const [analyzingSubId, setAnalyzingSubId] = useState<string | null>(null);
   const [aiGradingData, setAiGradingData] = useState<{ grade: number, feedback: string } | null>(null);
 
@@ -104,7 +105,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       status: asg.status as 'active' | 'archived',
       attachments: asg.attachments || []
     });
-    
+    // Set active tab based on existing data
     if (asg.fileUrl) setActiveTab(asg.description.includes('السبورة') ? 'board' : 'file');
     else if (asg.externalLink) setActiveTab('link');
     else setActiveTab('text');
@@ -139,17 +140,22 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     }
   };
 
+  // Rich Text Editor Functions
   const insertAtCursor = (prefix: string, suffix: string = '') => {
     const textarea = descTextareaRef.current;
     if (!textarea) return;
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = newAsg.desc;
     const before = text.substring(0, start);
     const selection = text.substring(start, end);
     const after = text.substring(end);
+
     const newText = before + prefix + selection + suffix + after;
     setNewAsg({ ...newAsg, desc: newText });
+
+    // Restore focus and cursor
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + prefix.length, end + prefix.length);
@@ -179,11 +185,13 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     setNewAsg(prev => ({ 
       ...prev, 
       fileUrl: dataUrl,
-      desc: prev.desc || 'واجب مرسوم من السبورة'
+      desc: prev.desc + (prev.desc ? '\n' : '') + '[رسم توضيحي مرفق من السبورة]'
     }));
     setShowBoard(false);
+    alert('تم التقاط الرسم وإلحاقه بالواجب بنجاح ✓');
   };
 
+  // Helper to check if assignment is overdue
   const isPastDue = (dateString: string) => {
     if (!dateString) return false;
     const today = new Date();
@@ -197,12 +205,14 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       alert("لا يوجد ملف مرفق لتحليله.");
       return;
     }
+    
     setAnalyzingSubId(sub.id);
     try {
       const aiResponse = await analyzeStudentWork(
-        { data: sub.fileUrl, mimeType: 'image/jpeg' }, 
+        { data: sub.fileUrl, mimeType: 'image/jpeg' }, // Defaulting to jpeg, service extracts actual from base64 header usually
         notation
       );
+
       setAiGradingData({
         grade: aiResponse.suggestedGrade,
         feedback: aiResponse.feedback
@@ -576,12 +586,12 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       )}
 
       {showBoard && (
-        <div className="fixed inset-0 z-[600] bg-indigo-950 p-2 md:p-6 flex flex-col animate-fadeIn">
-           <div className="flex justify-between items-center mb-4 px-8 text-white">
-              <h3 className="font-black text-xl md:text-2xl">سبورة رسم الواجب 🖋️</h3>
-              <button onClick={() => setShowBoard(false)} className="w-12 h-12 bg-white/10 hover:bg-rose-600 rounded-2xl flex items-center justify-center text-2xl transition-all">✕</button>
+        <div className="fixed inset-0 z-[600] bg-indigo-950 p-0 md:p-2 flex flex-col animate-fadeIn">
+           <div className="flex justify-between items-center p-4 px-6 text-white bg-indigo-950/90 backdrop-blur-md sticky top-0 z-10">
+              <h3 className="font-black text-lg md:text-2xl">سبورة رسم الواجب 🖋️</h3>
+              <button onClick={() => setShowBoard(false)} className="w-10 h-10 bg-white/10 hover:bg-rose-600 rounded-xl flex items-center justify-center text-xl transition-all">✕</button>
            </div>
-           <div className="flex-1 bg-white rounded-[4rem] overflow-hidden shadow-2xl">
+           <div className="flex-1 bg-white rounded-t-[2rem] md:rounded-[4rem] overflow-hidden shadow-2xl relative">
               <InteractiveBoard 
                 onSave={handleBoardCapture} 
                 onCancel={() => setShowBoard(false)} 

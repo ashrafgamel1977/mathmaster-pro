@@ -36,12 +36,16 @@ const Notifications: React.FC<NotificationsProps> = ({ notifications, years, gro
 
   const handleSend = () => {
     if (!newNotif.title || !newNotif.message) return;
+    
+    // Fix: Firestore does not accept 'undefined'. Use 'null' for optional fields.
+    // Casting to 'any' to bypass strict TS check if interface defines optional as 'string | undefined'
     onSend({
       title: newNotif.title,
       message: newNotif.message,
       type: newNotif.type,
-      targetYearId: newNotif.targetYearId === 'all' ? undefined : newNotif.targetYearId
-    }, triggerPush);
+      targetYearId: newNotif.targetYearId === 'all' ? null : newNotif.targetYearId
+    } as any, triggerPush);
+    
     setShowAdd(false);
     setNewNotif({ title: '', message: '', type: 'general', targetYearId: 'all' });
   };

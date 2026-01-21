@@ -1,8 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, Student, Year, MathNotation } from '../types';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { ChatMessage, Student, Year, MathNotation, EducationalSource, PlatformSettings, AppView } from '../types';
 import MathRenderer from '../components/MathRenderer';
 import { solveMathProblem } from '../services/geminiService';
+import InteractiveBoard from '../components/InteractiveBoard';
 
 interface ChatRoomProps {
   user: { id: string; name: string; role: 'teacher' | 'student'; yearId?: string };
@@ -13,6 +14,8 @@ interface ChatRoomProps {
   onMarkRead?: (studentId?: string) => void;
   onMarkGroupRead?: () => void;
   notation?: MathNotation;
+  educationalSources?: EducationalSource[];
+  settings?: PlatformSettings;
 }
 
 const QUICK_REPLIES = [
@@ -23,7 +26,7 @@ const QUICK_REPLIES = [
   "لا تنسَ كتابة الوحدات في النهاية 📏"
 ];
 
-const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, onSendMessage, onMarkRead, onMarkGroupRead, notation = 'arabic' }) => {
+const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, onSendMessage, onMarkRead, onMarkGroupRead, notation = 'arabic', educationalSources = [], settings }) => {
   const [activeTab, setActiveTab] = useState<'group' | 'private'>('group');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -31,9 +34,35 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
   const [isRecording, setIsRecording] = useState(false);
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   
+  // State for rendering AI drawing
+  const [drawingToRender, setDrawingToRender] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const DEFAULT_TABS: { id: string; label: string; disabled?: boolean }[] = [
+    { id: 'group', label: '🌍 الساحة العامة' },
+    { id: 'private', label: '🔒 مراسلة المعلم' }
+  ];
+
+  const tabs = useMemo(() => {
+    if (!settings?.featureConfig?.[AppView.CHAT]) return DEFAULT_TABS;
+    const config = settings.featureConfig[AppView.CHAT];
+    return DEFAULT_TABS.map(t => {
+        const conf = config.find(c => c.id === t.id);
+        if (conf) {
+            return { ...t, label: conf.label, disabled: !conf.enabled };
+        }
+        return t;
+    }).filter(t => !t.disabled);
+  }, [settings]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
+        setActiveTab(tabs[0].id as any);
+    }
+  }, [tabs, activeTab]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -90,14 +119,49 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
       setIsAiLoading(true);
       try {
         const question = textToSend.replace('@ذكاء', '').trim();
-        const aiResponse = await solveMathProblem(question, undefined, notation as MathNotation);
+        
+        // 1. Get Student Year
+        const studentYearId = user.role === 'student' ? user.yearId : (selectedStudentId ? students.find(s=>s.id===selectedStudentId)?.yearId : undefined);
+        const yearName = years.find(y => y.id === studentYearId)?.name || 'عام';
+
+        // 2. Fetch Grounding References for this Year
+        const references = educationalSources
+            .filter(s => s.isAiReference && (s.yearId === studentYearId || s.yearId === 'all'))
+            .map(s => s.textContent)
+            .join("\n\n");
+
+        // 3. Call AI with Reference
+        let aiResponse = await solveMathProblem(question, undefined, notation as MathNotation, yearName, references);
+        
+        // 4. Parse for Drawing Command
+        if (aiResponse.includes('||DRAWING_JSON||')) {
+            const parts = aiResponse.split('||DRAWING_JSON||');
+            const mainText = parts[0];
+            const drawingPart = parts[1].split('||END_DRAWING||')[0];
+            
+            // Clean response for chat
+            aiResponse = mainText + "\n\n*(تم إنشاء رسم توضيحي، اضغط للمعانية)*";
+            // Append data hiddenly or use a marker
+            aiResponse = mainText + `||DRAWING_DATA||${drawingPart}`;
+        }
+
         onSendMessage(`🤖 **المعلم المساعد الذكي:** \n\n ${aiResponse}`, 'group', undefined);
       } catch (e) {
+        console.error(e);
         onSendMessage("⚠️ عذراً، واجهت مشكلة في التفكير، حاول مرة أخرى!", 'group', undefined);
       } finally {
         setIsAiLoading(false);
       }
     }
+  };
+
+  // Helper to parse message content for drawing data
+  const parseMessageContent = (content: string) => {
+      if (content.includes('||DRAWING_DATA||')) {
+          const parts = content.split('||DRAWING_DATA||');
+          return { text: parts[0], drawingData: parts[1] };
+      }
+      return { text: content, drawingData: null };
   };
 
   const filteredMessages = messages.filter(m => {
@@ -120,8 +184,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
            </div>
         </div>
         <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-           <button onClick={() => setActiveTab('group')} className={`px-6 py-3 rounded-xl text-[10px] font-black transition-all ${activeTab === 'group' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>🌍 الساحة العامة</button>
-           <button onClick={() => setActiveTab('private')} className={`px-6 py-3 rounded-xl text-[10px] font-black transition-all ${activeTab === 'private' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>🔒 مراسلة المعلم</button>
+           {tabs.map(tab => (
+             <button 
+               key={tab.id}
+               onClick={() => setActiveTab(tab.id as any)} 
+               className={`px-6 py-3 rounded-xl text-[10px] font-black transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}
+             >
+               {tab.label}
+             </button>
+           ))}
         </div>
       </div>
 
@@ -146,6 +217,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
               const isMe = msg.senderId === user.id;
               const isTeacher = msg.senderRole === 'teacher';
               const isAi = msg.text.includes('🤖');
+              const { text, drawingData } = parseMessageContent(msg.text);
 
               return (
                 <div key={msg.id} className={`flex ${isMe ? 'justify-start' : 'justify-end'} animate-fadeIn`}>
@@ -167,7 +239,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
                            <audio src={msg.audioData} controls className="h-8 max-w-[150px] md:max-w-[200px]" />
                         </div>
                       ) : (
-                        <MathRenderer content={msg.text} inline />
+                        <div>
+                            <MathRenderer content={text} inline />
+                            {drawingData && (
+                                <button 
+                                    onClick={() => setDrawingToRender(drawingData)}
+                                    className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    <span>مشاهدة الرسم الهندسي</span>
+                                    <span>📐</span>
+                                </button>
+                            )}
+                        </div>
                       )}
                       
                       {isTeacher && !isMe && (
@@ -181,7 +264,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
             {isAiLoading && (
               <div className="flex justify-center py-4 animate-pulse">
                  <div className="bg-slate-900 px-6 py-3 rounded-full text-blue-400 text-[10px] font-black shadow-xl">
-                    🤖 المساعد الذكي يستعرض عبقريته الآن...
+                    🤖 المساعد الذكي يراجع المصادر المعتمدة...
                  </div>
               </div>
             )}
@@ -224,6 +307,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
           </div>
         </div>
       </div>
+
+      {/* Programmatic Drawing Modal */}
+      {drawingToRender && (
+          <div className="fixed inset-0 z-[1000] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white w-full max-w-4xl rounded-[3rem] h-[80vh] shadow-2xl relative overflow-hidden flex flex-col">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-black text-xl text-slate-800">الرسم الهندسي المولد بالذكاء الاصطناعي</h3>
+                      <button onClick={() => setDrawingToRender(null)} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-rose-50 hover:text-rose-500 transition-all border shadow-sm">✕</button>
+                  </div>
+                  <div className="flex-1 relative bg-white">
+                      <InteractiveBoard 
+                         initialData={drawingToRender}
+                         onSave={()=>{}} 
+                         onCancel={() => setDrawingToRender(null)} 
+                         title="AI Generated"
+                         initialBackground="grid"
+                      />
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppView, PlatformSettings, Assistant } from '../types';
 
 interface BottomNavProps {
@@ -11,113 +11,182 @@ interface BottomNavProps {
   loggedUser?: any;
 }
 
+const SYSTEM_VIEWS = [
+  AppView.DASHBOARD,
+  AppView.MANAGEMENT,
+  AppView.STUDENTS,
+  AppView.ASSIGNMENTS,
+  AppView.QUIZZES,
+  AppView.FILES,
+  AppView.LIVE_CLASS,
+  AppView.CHAT,
+  AppView.NOTIFICATIONS,
+  AppView.RESULTS,
+  AppView.REWARDS,
+  AppView.SCHEDULE,
+  AppView.AI_SOLVER,
+  AppView.FORMULAS,
+  AppView.LEADERBOARD,
+  AppView.CALL_CENTER,
+  AppView.TEST_CENTER,
+  AppView.LAUNCH_GUIDE,
+  AppView.STUDENT_PORTAL
+];
+
+const DEFAULT_LABELS: Record<string, string> = {
+  [AppView.DASHBOARD]: 'الرئيسية',
+  [AppView.MANAGEMENT]: 'المجموعات',
+  [AppView.STUDENT_PORTAL]: 'بوابة الطالب',
+  [AppView.STUDENTS]: 'الطلاب',
+  [AppView.ASSIGNMENTS]: 'الواجبات',
+  [AppView.QUIZZES]: 'المختبر',
+  [AppView.FILES]: 'المكتبة',
+  [AppView.LIVE_CLASS]: 'البث',
+  [AppView.CHAT]: 'النقاش',
+  [AppView.NOTIFICATIONS]: 'التنبيهات',
+  [AppView.RESULTS]: 'النتائج',
+  [AppView.REWARDS]: 'المتجر',
+  [AppView.SCHEDULE]: 'الجدول',
+  [AppView.AI_SOLVER]: 'المحلل',
+  [AppView.FORMULAS]: 'القوانين',
+  [AppView.LEADERBOARD]: 'المتصدرين',
+  [AppView.CALL_CENTER]: 'اتصالات',
+  [AppView.TEST_CENTER]: 'تقني',
+  [AppView.LAUNCH_GUIDE]: 'دليل',
+  [AppView.CONTROL_PANEL]: 'الإعدادات'
+};
+
+const DEFAULT_ICONS: Record<string, string> = {
+  [AppView.DASHBOARD]: '🏠',
+  [AppView.MANAGEMENT]: '🏫',
+  [AppView.STUDENT_PORTAL]: '🎓',
+  [AppView.STUDENTS]: '👥',
+  [AppView.ASSIGNMENTS]: '📚',
+  [AppView.QUIZZES]: '📝',
+  [AppView.FILES]: '📁',
+  [AppView.LIVE_CLASS]: '🎥',
+  [AppView.CHAT]: '💬',
+  [AppView.NOTIFICATIONS]: '🔔',
+  [AppView.RESULTS]: '📊',
+  [AppView.REWARDS]: '🎁',
+  [AppView.SCHEDULE]: '📅',
+  [AppView.AI_SOLVER]: '🧠',
+  [AppView.FORMULAS]: '📐',
+  [AppView.LEADERBOARD]: '🏆',
+  [AppView.CALL_CENTER]: '📞',
+  [AppView.TEST_CENTER]: '🧪',
+  [AppView.LAUNCH_GUIDE]: '🚀',
+  [AppView.CONTROL_PANEL]: '⚙️'
+};
+
 const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, settings, pendingCount = 0, unreadChatCount = 0, loggedUser }) => {
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
   const isAssistant = loggedUser?.role === 'assistant';
-  const permissions = isAssistant ? (loggedUser as Assistant).permissions : Object.values(AppView);
+  const permissions = isAssistant ? (loggedUser as Assistant).permissions : null;
+  const primaryColor = settings.branding?.primaryColor || '#3b82f6';
 
-  const mainItems = [
-    { id: AppView.DASHBOARD, label: settings.viewLabels?.[AppView.DASHBOARD] || 'الرئيسية', icon: '🏠' },
-    { id: AppView.STUDENTS, label: settings.viewLabels?.[AppView.STUDENTS] || 'الطلاب', icon: '👥' },
-    { id: AppView.CHAT, label: settings.viewLabels?.[AppView.CHAT] || 'النقاش', icon: '💬', showChatDot: true },
-    { id: AppView.QUIZZES, label: settings.viewLabels?.[AppView.QUIZZES] || 'المختبر', icon: '📝' },
-  ].filter(item => isAssistant ? permissions.includes(item.id as AppView) : true);
+  // Collect all valid items
+  const allValidItems = useMemo(() => {
+    const items = [];
 
-  const moreItemsBase = [
-    { id: AppView.RESULTS, label: settings.viewLabels?.[AppView.RESULTS] || 'النتائج', icon: '📊', showDot: true },
-    { id: AppView.STUDENT_PORTAL, label: 'بوابة الطالب', icon: '🎓' },
-    { id: AppView.ASSIGNMENTS, label: settings.viewLabels?.[AppView.ASSIGNMENTS] || 'الواجبات', icon: '📚', showDot: true },
-    { id: AppView.MANAGEMENT, label: settings.viewLabels?.[AppView.MANAGEMENT] || 'المجموعات', icon: '🏫' },
-    { id: AppView.LIVE_CLASS, label: settings.viewLabels?.[AppView.LIVE_CLASS] || 'البث', icon: '🎥' },
-    { id: AppView.FILES, label: settings.viewLabels?.[AppView.FILES] || 'المكتبة', icon: '📁' },
-    { id: AppView.AI_SOLVER, label: settings.viewLabels?.[AppView.AI_SOLVER] || 'المحلل', icon: '🧠' },
-  ].filter(item => isAssistant ? permissions.includes(item.id as AppView) : true);
+    // System Views
+    SYSTEM_VIEWS.forEach(viewId => {
+       const isEnabled = (settings.enabledViews || Object.values(AppView)).includes(viewId);
+       
+       let hasAccess = isEnabled;
+       if (isAssistant && permissions && !permissions.includes(viewId)) {
+          hasAccess = (viewId === AppView.DASHBOARD);
+       }
 
-  const customItems = (settings.customSections || []).map(s => ({
-    id: s.id,
-    label: s.title,
-    icon: s.icon,
-    showDot: false
-  }));
+       if (hasAccess) {
+          items.push({
+             id: viewId,
+             label: settings.viewLabels?.[viewId] || DEFAULT_LABELS[viewId] || viewId,
+             icon: settings.viewIcons?.[viewId] || DEFAULT_ICONS[viewId] || '🔹',
+             badge: (viewId === AppView.ASSIGNMENTS ? pendingCount : (viewId === AppView.CHAT ? unreadChatCount : 0))
+          });
+       }
+    });
 
-  const allMoreItems = [...moreItemsBase, ...customItems];
-  if (!isAssistant) {
-     allMoreItems.push({ id: AppView.SETTINGS, label: 'الإعدادات', icon: '⚙️', showDot: false });
-  }
+    // Custom Sections
+    if (settings.customSections) {
+       settings.customSections.forEach(sec => {
+          items.push({
+             id: sec.id,
+             label: sec.title,
+             icon: sec.icon,
+             badge: 0
+          });
+       });
+    }
+
+    // Add Settings at end for Teacher
+    if (!isAssistant) {
+       items.push({
+          id: AppView.CONTROL_PANEL,
+          label: settings.viewLabels?.[AppView.CONTROL_PANEL] || DEFAULT_LABELS[AppView.CONTROL_PANEL],
+          icon: settings.viewIcons?.[AppView.CONTROL_PANEL] || DEFAULT_ICONS[AppView.CONTROL_PANEL],
+          badge: 0
+       });
+    }
+
+    return items.sort((a, b) => {
+       if (a.id === AppView.DASHBOARD) return -1;
+       if (b.id === AppView.DASHBOARD) return 1;
+       return 0;
+    });
+  }, [settings, isAssistant, permissions, pendingCount, unreadChatCount]);
 
   return (
     <>
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] lg:hidden w-[92%] max-w-md">
-        <nav className="bg-slate-900/80 backdrop-blur-3xl rounded-[2.5rem] shadow-2xl border border-white/10 p-2 flex justify-around items-center h-20">
-          {mainItems.map((item) => {
-            const hasDot = (item.showChatDot && unreadChatCount > 0);
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => { setView(item.id); setIsMoreOpen(false); }}
-                className={`flex flex-col items-center justify-center flex-1 h-full rounded-2xl transition-all relative ${
-                  isActive ? 'bg-blue-600 text-white scale-105 shadow-lg' : 'text-slate-400'
-                }`}
-              >
-                <span className="text-xl mb-1">{item.icon}</span>
-                <span className="text-[8px] font-black uppercase tracking-wider">{item.label}</span>
-                {hasDot && (
-                  <span className="absolute top-3 right-4 w-2 h-2 bg-rose-500 rounded-full border border-white shadow-sm animate-pulse"></span>
-                )}
-              </button>
-            );
-          })}
-          
-          <button
-            onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className={`flex flex-col items-center justify-center flex-1 h-full rounded-2xl transition-all relative ${
-              isMoreOpen ? 'bg-blue-600 text-white scale-105 shadow-lg' : 'text-slate-400'
-            }`}
-          >
-            <span className="text-xl mb-1">{isMoreOpen ? '✕' : '☰'}</span>
-            <span className="text-[8px] font-black uppercase tracking-wider">المزيد</span>
-            {!isMoreOpen && (pendingCount > 0 || unreadChatCount > 0) && (
-              <span className="absolute top-3 right-4 w-2 h-2 bg-amber-500 rounded-full border border-white shadow-sm animate-pulse"></span>
-            )}
-          </button>
-        </nav>
-      </div>
-
-      {isMoreOpen && (
-        <div className="fixed inset-0 z-[95] lg:hidden flex items-end animate-fadeIn">
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setIsMoreOpen(false)}></div>
-          <div className="relative w-full bg-[#111827] rounded-t-[3.5rem] p-10 pb-32 animate-slideUp shadow-2xl max-h-[85vh] overflow-y-auto no-scrollbar border-t border-white/10">
-            <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-10"></div>
-            <div className="grid grid-cols-3 gap-4">
-              {allMoreItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setView(item.id); setIsMoreOpen(false); }}
-                  className={`flex flex-col items-center gap-3 p-5 rounded-[2rem] transition-all relative ${
-                    currentView === item.id ? 'bg-blue-600 text-white shadow-xl' : 'bg-white/5 text-slate-500 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="text-2xl">{item.icon}</span>
-                  <span className="text-[9px] font-black text-center leading-tight">{item.label}</span>
-                  {(item.showDot && pendingCount > 0) && (
-                    <span className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full border-2 border-slate-900 shadow-sm"></span>
-                  )}
-                </button>
-              ))}
-              {isAssistant && (
-                <button
-                  onClick={() => window.location.reload()}
-                  className="flex flex-col items-center gap-3 p-5 rounded-[2rem] bg-rose-500/10 text-rose-500"
-                >
-                  <span className="text-2xl">🚪</span>
-                  <span className="text-[9px] font-black text-center leading-tight">خروج</span>
-                </button>
-              )}
+      {/* Smart Fab Container */}
+      <div className="lg:hidden fixed bottom-6 left-6 z-[100] flex flex-col items-start gap-4">
+         
+         {/* Menu List */}
+         {isFabOpen && (
+            <div className="flex flex-col gap-2 mb-2 animate-slideUp max-h-[60vh] overflow-y-auto no-scrollbar p-2 glass-strong rounded-[2rem]">
+               {allValidItems.map((item) => (
+                  <button
+                     key={item.id}
+                     onClick={() => { setView(item.id); setIsFabOpen(false); }}
+                     className={`flex items-center gap-3 px-5 py-3 rounded-2xl transition-all ${
+                        currentView === item.id 
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                        : 'hover:bg-white/50 text-slate-700'
+                     }`}
+                  >
+                     <span className="text-xl">{item.icon}</span>
+                     <span className="font-bold text-sm whitespace-nowrap">{item.label}</span>
+                     {item.badge > 0 && (
+                        <span className="w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] font-black shadow-sm">{item.badge}</span>
+                     )}
+                  </button>
+               ))}
             </div>
-          </div>
-        </div>
-      )}
+         )}
+
+         {/* Main Fab Button */}
+         <button
+            onClick={() => setIsFabOpen(!isFabOpen)}
+            className={`w-16 h-16 rounded-[1.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.15)] flex items-center justify-center text-3xl text-white transition-all backdrop-blur-md border border-white/20 ${
+               isFabOpen ? 'bg-rose-500/90 rotate-90' : 'bg-blue-600/90 hover:scale-110 active:scale-95'
+            }`}
+            style={{ backgroundColor: isFabOpen ? undefined : (primaryColor + 'E6') }} // Hex with opacity
+         >
+            {isFabOpen ? '✕' : '☰'}
+            {(!isFabOpen && (pendingCount > 0 || unreadChatCount > 0)) && (
+               <span className="absolute top-0 right-0 w-4 h-4 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
+            )}
+         </button>
+
+         {/* Backdrop */}
+         {isFabOpen && (
+            <div 
+               className="fixed inset-0 bg-slate-900/40 z-[-1] backdrop-blur-sm transition-all"
+               onClick={() => setIsFabOpen(false)}
+            ></div>
+         )}
+      </div>
     </>
   );
 };

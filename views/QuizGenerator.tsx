@@ -1,6 +1,6 @@
 
-import React, { useState, useRef } from 'react';
-import { Quiz, Year, EducationalSource, MathNotation } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { Quiz, Year, EducationalSource, MathNotation, AppView, PlatformSettings } from '../types';
 import { generateQuizFromContent } from '../services/geminiService';
 import MathRenderer from '../components/MathRenderer';
 import InteractiveBoard from '../components/InteractiveBoard';
@@ -18,7 +18,10 @@ interface QuizGeneratorProps {
   years: Year[];
   sources: EducationalSource[];
   notation: MathNotation;
+  quizzes?: Quiz[]; // Added prop
   onPublish: (title: string, yearId: string, questions: any[] | null, type: string, externalLink?: string, fileUrl?: string) => void;
+  onDelete?: (id: string) => void; // Added prop
+  settings?: PlatformSettings;
 }
 
 const MATH_BRANCHES = [
@@ -28,8 +31,9 @@ const MATH_BRANCHES = [
   { id: 'stats', name: 'إحصاء', icon: '📊', color: 'from-amber-500 to-yellow-600' },
 ];
 
-const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublish }) => {
-  const [activeTab, setActiveTab] = useState<'ai' | 'scanner' | 'editor' | 'external'>('ai');
+const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublish, settings, quizzes = [], onDelete }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'create'>('list'); // New State
+  const [activeTab, setActiveTab] = useState<string>('ai');
   const [quizTitle, setQuizTitle] = useState('');
   const [targetYearId, setTargetYearId] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
@@ -42,6 +46,32 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
   
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const scannerInputRef = useRef<HTMLInputElement>(null);
+
+  // Default Tabs
+  const DEFAULT_TABS: { id: string; n: string; i: string; disabled?: boolean }[] = [
+    { id: 'ai', n: 'مولد الأسئلة', i: '🪄' },
+    { id: 'scanner', n: 'ماسح الورق', i: '📸' },
+    { id: 'editor', n: 'المحرر اليدوي', i: '✏️' },
+    { id: 'external', n: 'روابط خارجية', i: '🔗' },
+  ];
+
+  const tabs = React.useMemo(() => {
+    if (!settings?.featureConfig?.[AppView.QUIZZES]) return DEFAULT_TABS;
+    const config = settings.featureConfig[AppView.QUIZZES];
+    return DEFAULT_TABS.map(t => {
+        const conf = config.find(c => c.id === t.id);
+        if (conf) {
+            return { ...t, n: conf.label, disabled: !conf.enabled };
+        }
+        return t;
+    }).filter(t => !t.disabled);
+  }, [settings]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
+        setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   const handleAiGenerate = async (topicOverride?: string) => {
     const finalTopic = topicOverride || aiTopic;
@@ -72,7 +102,7 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
       const reader = new FileReader();
       reader.onload = (ev) => {
         setScanPreview(ev.target?.result as string);
-        setActiveTab('ai'); // الانتقال لقسم الذكاء الاصطناعي لبدء التحليل
+        setActiveTab('ai');
       };
       reader.readAsDataURL(file);
     }
@@ -91,8 +121,92 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
     setActiveTab('editor');
   };
 
+  const addStandardTemplate = () => {
+    const questions: Question[] = Array(5).fill(null).map((_, i) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'mcq',
+      question: `سؤال رقم ${i + 1}`,
+      options: ['الاختيار الأول', 'الاختيار الثاني', 'الاختيار الثالث', 'الاختيار الرابع'],
+      correctAnswer: 0,
+      points: 1
+    }));
+    setManualQuestions(questions);
+    setDifficulty('medium');
+    setQCount(5);
+    setActiveTab('editor');
+    if (!quizTitle) setQuizTitle('اختبار جديد (نموذج)');
+  };
+
+  const handlePublish = () => {
+      onPublish(quizTitle, targetYearId, manualQuestions, 'native');
+      // Reset and go back to list
+      setManualQuestions([]);
+      setQuizTitle('');
+      setViewMode('list');
+  };
+
+  // --- View: List of Quizzes ---
+  if (viewMode === 'list') {
+      return (
+        <div className="max-w-7xl mx-auto space-y-10 animate-slideUp pb-24 text-right px-4 md:px-0" dir="rtl">
+            <div className="bg-indigo-900 p-10 md:p-14 rounded-[4rem] text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_10%_20%,_rgba(255,255,255,0.1),transparent_60%)]"></div>
+                <div className="relative z-10 space-y-2">
+                    <h2 className="text-3xl md:text-5xl font-black tracking-tight">إدارة الاختبارات ⚡</h2>
+                    <p className="text-indigo-200 font-bold text-sm md:text-lg">لديك {quizzes.length} اختبار منشور للطلاب.</p>
+                </div>
+                <button 
+                    onClick={() => setViewMode('create')}
+                    className="relative z-10 px-10 py-5 bg-white text-indigo-900 rounded-[2.5rem] font-black text-sm shadow-xl hover:scale-105 transition-all flex items-center gap-2"
+                >
+                    <span>إنشاء اختبار جديد</span>
+                    <span className="text-xl">＋</span>
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {quizzes.map((quiz) => (
+                    <div key={quiz.id} className="bg-white p-8 rounded-[3rem] shadow-lg border border-slate-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">
+                                {years.find(y => y.id === quiz.yearId)?.name || 'عام'}
+                            </span>
+                            <button 
+                                onClick={() => { if(confirm('حذف الاختبار نهائياً؟')) onDelete?.(quiz.id); }}
+                                className="w-8 h-8 rounded-full bg-slate-50 text-rose-400 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all"
+                            >
+                                🗑️
+                            </button>
+                        </div>
+                        <h3 className="text-xl font-black text-slate-800 mb-2">{quiz.title}</h3>
+                        <div className="flex items-center gap-4 text-xs font-bold text-slate-400 mt-4">
+                            <span className="flex items-center gap-1">📅 {quiz.date}</span>
+                            <span className="flex items-center gap-1">📝 {quiz.questions?.length || 0} أسئلة</span>
+                        </div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-right"></div>
+                    </div>
+                ))}
+                {quizzes.length === 0 && (
+                    <div className="col-span-full py-32 text-center opacity-40 bg-white rounded-[4rem] border-4 border-dashed border-slate-200">
+                        <span className="text-6xl block mb-4">📭</span>
+                        <p className="font-black text-xl text-slate-500">لا توجد اختبارات منشورة بعد.</p>
+                        <p className="text-sm font-bold text-slate-400 mt-2">اضغط على زر "إنشاء اختبار جديد" في الأعلى للبدء.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+      );
+  }
+
+  // --- View: Create Quiz (Existing Generator UI) ---
   return (
     <div className="max-w-7xl mx-auto space-y-10 animate-slideUp pb-24 text-right px-4 md:px-0" dir="rtl">
+      {/* Header with Back Button */}
+      <div className="flex items-center justify-between mb-4">
+          <button onClick={() => setViewMode('list')} className="px-6 py-3 bg-white rounded-2xl text-slate-500 font-black text-xs shadow-sm hover:text-indigo-600 transition-all">← العودة للقائمة</button>
+          <h3 className="font-black text-slate-400 text-sm uppercase tracking-widest">وضع الإنشاء</h3>
+      </div>
+
       {/* Dynamic Lab Header */}
       <div className="relative overflow-hidden rounded-[4rem] bg-slate-900 p-10 md:p-16 text-white shadow-2xl border border-white/5">
         <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_10%_20%,_rgba(59,130,246,0.1),transparent_50%)]"></div>
@@ -103,12 +217,7 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
           </div>
           
           <div className="flex bg-white/5 backdrop-blur-2xl p-2 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-x-auto no-scrollbar max-w-full">
-            {[
-              { id: 'ai', n: 'مولد الأسئلة', i: '🪄' },
-              { id: 'scanner', n: 'ماسح الورق', i: '📸' },
-              { id: 'editor', n: 'المحرر اليدوي', i: '✏️' },
-              { id: 'external', n: 'روابط خارجية', i: '🔗' },
-            ].map(tab => (
+            {tabs.map(tab => (
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -149,6 +258,13 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">عدد الأسئلة: {qCount}</label>
                  <input type="range" min="3" max="20" className="w-full accent-blue-600" value={qCount} onChange={e => setQCount(parseInt(e.target.value))} />
               </div>
+
+              <button 
+                onClick={addStandardTemplate}
+                className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-xs hover:bg-indigo-100 transition-all border border-indigo-200 border-dashed flex items-center justify-center gap-2"
+              >
+                <span>+ نموذج قياسي (5 أسئلة)</span>
+              </button>
            </div>
         </div>
 
@@ -281,7 +397,7 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
                 {manualQuestions.length > 0 && (
                    <div className="pt-10 flex justify-center">
                       <button 
-                        onClick={() => onPublish(quizTitle, targetYearId, manualQuestions, 'native')}
+                        onClick={handlePublish}
                         disabled={!quizTitle || !targetYearId}
                         className="px-20 py-7 bg-blue-600 text-white rounded-[2.5rem] font-black shadow-2xl hover:scale-105 transition-all disabled:opacity-50 text-xl"
                       >نشر الاختبار النهائي لطلابك ✓</button>

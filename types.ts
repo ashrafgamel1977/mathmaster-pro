@@ -103,7 +103,9 @@ export interface Student {
   lastReadNotificationId?: string;
   lastSpinDate?: string;
   preferences?: StudentPreferences;
-  lastReportDate?: string; // New field for tracking reports
+  lastReportDate?: string; 
+  subjectScores?: Record<string, number>; 
+  completedLessons?: string[]; 
 }
 
 export interface Year { id: string; name: string; }
@@ -119,8 +121,51 @@ export interface Group {
   capacity?: number;
   codePrefix?: string;
 }
-export interface Quiz { id: string; title: string; yearId: string; date: string; type: string; questions?: any[]; }
-export interface QuizResult { id: string; studentId: string; quizId: string; quizTitle: string; score: number; status: 'pending' | 'graded'; date: string; handwrittenUrl?: string; aiFeedback?: string; feedback?: string; isCheatSuspected?: boolean; }
+
+export interface Question {
+  id: string;
+  type: 'mcq' | 'fill_blanks' | 'short_answer';
+  question: string;
+  options?: string[];
+  correctAnswer: string | number;
+  points: number;
+  branch?: string; 
+}
+
+export interface Quiz { 
+  id: string; 
+  title: string; 
+  yearId: string; 
+  date: string; 
+  type: string; 
+  questions?: Question[]; 
+  duration?: number; 
+}
+
+export interface QuestionAttempt {
+  questionId: string;
+  questionText: string;
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  aiExplanation?: string; 
+}
+
+export interface QuizResult { 
+  id: string; 
+  studentId: string; 
+  quizId: string; 
+  quizTitle: string; 
+  score: number; 
+  status: 'pending' | 'graded'; 
+  date: string; 
+  handwrittenUrl?: string; 
+  aiFeedback?: string; 
+  feedback?: string; 
+  isCheatSuspected?: boolean; 
+  cheatWarnings?: number; 
+  attempts?: QuestionAttempt[]; 
+}
 
 export interface Assignment {
   id: string;
@@ -149,7 +194,8 @@ export interface AssignmentSubmission {
   fileUrl: string; 
   grade?: number; 
   status: 'pending' | 'graded'; 
-  feedback?: string; 
+  feedback?: string;
+  audioFeedback?: string; 
   aiSuggestedGrade?: number;
   aiAnalysis?: string;
 }
@@ -167,6 +213,11 @@ export interface EducationalSource {
   uploadDate: string;
   yearId: string;
   ratings?: Rating[];
+  nextSourceId?: string;
+  isAiReference?: boolean;
+  textContent?: string;
+  term?: '1' | '2'; // Added: First Term or Second Term
+  subject?: string; // Added: Algebra, Geometry, etc.
 }
 
 export interface ScheduleEntry {
@@ -197,22 +248,25 @@ export interface ChatMessage {
   recipientId?: string;
   yearId?: string;
   audioData?: string;
+  drawingData?: string; // New: For programmatic geometry
 }
 
 export interface VideoLesson {
   id: string;
   title: string;
-  youtubeUrl: string; // Used for URL irrespective of provider
-  provider?: 'youtube' | 'bunny' | 'native'; // New field to identify source
+  youtubeUrl: string; 
+  provider?: 'youtube' | 'bunny' | 'native'; 
   yearId: string;
   uploadDate: string;
   thumbnailUrl?: string;
+  term?: '1' | '2'; // Added: First Term or Second Term
+  subject?: string; // Added: Algebra, Geometry, etc.
 }
 
 export interface VideoNote {
   id: string;
   videoId: string;
-  timestamp: number; // in seconds
+  timestamp: number; 
   text: string;
   createdAt: string;
 }
@@ -260,11 +314,11 @@ export interface AppNotification {
 export interface BrandingSettings {
   primaryColor: string;
   secondaryColor: string;
-  fontFamily: AppFont; // New Font Setting
+  fontFamily: AppFont; 
   logoUrl?: string;
   heroImageUrl?: string;
   faviconUrl?: string;
-  sidebarGradient?: string; // New: Sidebar background gradient
+  sidebarGradient?: string; 
 }
 
 export interface ContentTextSettings {
@@ -297,7 +351,7 @@ export interface PlatformSettings {
   teacherName: string;
   platformName: string;
   adminCode: string; 
-  studentWelcomeMsg: string; // Deprecated, use contentTexts
+  studentWelcomeMsg: string;
   parentWelcomeMsg: string;  
   protectionEnabled: boolean;
   watermarkEnabled: boolean;
@@ -307,6 +361,7 @@ export interface PlatformSettings {
   liveSessionActive: boolean;
   liveSessionLink: string;
   liveSessionTitle: string;
+  liveSessionTargetYear?: string; // New: Target audience
   allowSelfRegistration: boolean;
   mathNotation: MathNotation;
   autoAttendanceEnabled: boolean;
@@ -326,5 +381,5 @@ export interface PlatformSettings {
   branding: BrandingSettings;
   contentTexts: ContentTextSettings;
   dashboardWidgets?: DashboardWidgets; 
-  featureConfig?: FeatureConfig; // New: Internal tabs config
+  featureConfig?: FeatureConfig; 
 }

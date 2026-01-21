@@ -1,13 +1,10 @@
-
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Student, QuizResult, Assignment, PlatformSettings, VideoLesson, Quiz, AssignmentSubmission, ChatMessage, Year, AppNotification, Group, EducationalSource, ScheduleEntry, MathFormula, PlatformReward, RewardRedemption } from '../types';
-import ProtectedVideo from '../components/ProtectedVideo';
-import Notifications from './Notifications';
-import ChatRoom from './ChatRoom';
-import AISolver from './AISolver';
-import Rewards from './Rewards';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Student, QuizResult, Assignment, PlatformSettings, VideoLesson, Quiz, AssignmentSubmission, ChatMessage, Year, AppNotification, Group, EducationalSource, ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, AppView, QuestionAttempt } from '../types';
 import LuckyWheel from '../components/LuckyWheel';
 import MathRenderer from '../components/MathRenderer';
+import ProtectedVideo from '../components/ProtectedVideo';
+import { explainWrongAnswer } from '../services/geminiService';
+import InteractiveBoard from '../components/InteractiveBoard';
 
 interface StudentPortalProps {
   student: Student | null;
@@ -32,706 +29,630 @@ interface StudentPortalProps {
   onRedeemReward: (rewardId: string) => void;
   onSpinWin?: (points: number) => void;
   onUpdateStudent?: (updates: Partial<Student>) => void;
+  onRateSource: (sourceId: string, rating: number) => void;
+  onVideoProgress?: (videoId: string, percent: number) => void;
+  onSendNotification?: (notification: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => void; 
   messages: ChatMessage[];
   years: Year[];
   students: Student[];
   onBack: () => void;
 }
 
-const DEFAULT_ICONS = {
-  home: '🏠',
-  lessons: '🎬',
-  library: '📁',
-  quizzes: '📝',
-  chat: '💬'
-};
-
-const ICON_OPTIONS = [
-  '🏠', '🏰', '🎪', '🚀', '🛸', '⛺', '🏝️',
-  '🎬', '🎥', '📺', '📽️', '📹', '💻', '📱',
-  '📁', '📚', '📖', '📒', '📜', '💾', '💿',
-  '📝', '✏️', '✒️', '✍️', '🧠', '🎯', '⚡',
-  '💬', '💭', '🗣️', '📢', '📞', '📟', '📧',
-  '🌟', '🔥', '💎', '🌈', '🎨', '🧩', '🎮'
+const SUBJECTS = [
+  { id: 'algebra', name: 'الجبر', icon: '🧮', color: '#3b82f6' },
+  { id: 'geometry', name: 'هندسة', icon: '📐', color: '#10b981' },
+  { id: 'calculus', name: 'التفاضل', icon: '📈', color: '#f59e0b' },
+  { id: 'trig', name: 'المثلثات', icon: '🔺', color: '#8b5cf6' },
+  { id: 'statics', name: 'الاستاتيكا', icon: '🏗️', color: '#6366f1' },
+  { id: 'dynamics', name: 'الديناميكا', icon: '🚀', color: '#ec4899' },
 ];
 
 const StudentPortal: React.FC<StudentPortalProps> = ({ 
   student, assignments, submissions, quizzes, results, settings, videoLessons, notifications,
-  groups, educationalSources, schedules, formulas, rewards, redemptions,
-  onQuizSubmit, onAssignmentSubmit, onLogin, onSendMessage, onMarkNotificationRead, onRedeemReward, onSpinWin, onUpdateStudent, messages, years, students, onBack 
+  onQuizSubmit, onAssignmentSubmit, onSendMessage, onRedeemReward, onSpinWin, onBack,
+  educationalSources, rewards, onVideoProgress, onUpdateStudent, onSendNotification, years
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'lessons' | 'quizzes' | 'rewards' | 'library' | 'schedule' | 'formulas' | 'chat' | 'notifications' | 'ai_solver' | string>(() => {
-    return localStorage.getItem('math_student_activeTab') || 'home';
-  });
-
-  const [loginCode, setLoginCode] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [libraryFilter, setLibraryFilter] = useState<'video' | 'doc'>('video');
+  const [libraryTerm, setLibraryTerm] = useState<'all' | '1' | '2'>('all'); 
+  
+  const [showLuckyWheel, setShowLuckyWheel] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoLesson | null>(null);
-  const [showWheel, setShowWheel] = useState(false);
-  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
-  const [integrityWarnings, setIntegrityWarnings] = useState(0);
-  const [isBlurred, setIsBlurred] = useState(false);
-  const [notifPermission, setNotifPermission] = useState(Notification.permission);
+  const [showLiveStream, setShowLiveStream] = useState(false);
   
-  // Customization State
-  const [showIconPicker, setShowIconPicker] = useState(false);
-  const [activeIconTab, setActiveIconTab] = useState<string>('home');
+  // Board Solving State
+  const [showBoard, setShowBoard] = useState(false);
+  const [solvingAsg, setSolvingAsg] = useState<Assignment | null>(null);
 
-  // Assignment Submission State
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [submissionFile, setSubmissionFile] = useState<string>('');
-  
-  // Quiz State
-  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
-  const [takingQuiz, setTakingQuiz] = useState<Quiz | null>(null);
+  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
+  const [activeQuizAnswers, setActiveQuizAnswers] = useState<Record<string, string>>({});
+  const [cheatWarnings, setCheatWarnings] = useState(0);
 
-  const primaryColor = settings.branding.primaryColor || '#2563eb';
-  const secondaryColor = settings.branding.secondaryColor || '#f59e0b';
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerImage, setScannerImage] = useState<string | null>(null);
+  const [scannedAsgId, setScannedAsgId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const userIcons = useMemo(() => ({
-    ...DEFAULT_ICONS,
-    ...(student?.preferences?.customIcons || {})
-  }), [student?.preferences?.customIcons]);
+  const [explainingQuestion, setExplainingQuestion] = useState<string | null>(null);
+  const [explanationText, setExplanationText] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('math_student_activeTab', activeTab);
-  }, [activeTab]);
+  const [isFabOpen, setIsFabOpen] = useState(false);
 
-  const studentYear = useMemo(() => years.find(y => y.id === student?.yearId), [student, years]);
-  const unreadCount = notifications.filter(n => !n.isRead && (n.targetStudentId === student?.id || n.targetYearId === student?.yearId)).length;
+  const isTeacherPreview = student?.id === 'teacher-view';
 
-  const canSpin = useMemo(() => {
-    if (!student?.lastSpinDate) return true;
-    const lastDate = new Date(student.lastSpinDate).getTime();
-    const now = new Date().getTime();
-    return (now - lastDate) >= (24 * 60 * 60 * 1000); 
-  }, [student?.lastSpinDate]);
+  const DEFAULT_TABS: { id: string; label: string; icon: string; disabled?: boolean }[] = [
+    { id: 'dashboard', label: 'الرئيسية', icon: '🏠' },
+    { id: 'library', label: 'دروسي', icon: '📚' },
+    { id: 'assignments', label: 'الواجبات', icon: '📝' },
+    { id: 'quizzes', label: 'الاختبارات', icon: '⚡' },
+    { id: 'results', label: 'نتائجي', icon: '📊' }
+  ];
 
-  const requestNotificationPermission = useCallback(async () => {
-    if (!('Notification' in window)) return;
-    const permission = await Notification.requestPermission();
-    setNotifPermission(permission);
-    if (permission === 'granted') {
-      new Notification('تم تفعيل التنبيهات بنجاح! 🔔', {
-        body: 'ستصلك الآن إشعارات بالواجبات والاختبارات الجديدة.',
-        icon: settings.branding.logoUrl
-      });
-    }
-  }, [settings.branding.logoUrl]);
-
-  // --- Integrity Mode Implementation ---
-  useEffect(() => {
-    if (settings.integrityMode && student && student.id !== 'guest_login') {
-      const handleVisibilityChange = () => {
-        if (document.hidden) {
-          setIsBlurred(true);
-          if (activeQuizId || takingQuiz) {
-             setIntegrityWarnings(prev => prev + 1);
-          }
-        } else {
-          setTimeout(() => setIsBlurred(false), 200);
-        }
-      };
-
-      const handleBlur = () => setIsBlurred(true);
-      const handleFocus = () => setIsBlurred(false);
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'PrintScreen' || (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'x'))) {
-          e.preventDefault();
-          alert('🚫 تم تعطيل هذه الوظيفة للحفاظ على نزاهة المنصة.');
-        }
-      };
-
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('blur', handleBlur);
-      window.addEventListener('focus', handleFocus);
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-      return () => {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('blur', handleBlur);
-        window.removeEventListener('focus', handleFocus);
-        document.removeEventListener('keydown', handleKeyDown);
-        document.removeEventListener('contextmenu', (e) => e.preventDefault());
-      };
-    }
-  }, [settings.integrityMode, activeQuizId, takingQuiz, student]);
+  const sidebarTabs = useMemo(() => {
+    if (!settings.featureConfig?.[AppView.STUDENT_PORTAL]) return DEFAULT_TABS;
+    const config = settings.featureConfig[AppView.STUDENT_PORTAL];
+    return DEFAULT_TABS.map(tab => {
+        const conf = config.find(c => c.id === tab.id);
+        if (conf) return { ...tab, label: conf.label, disabled: !conf.enabled };
+        return tab;
+    }).filter(t => !t.disabled);
+  }, [settings]);
 
   useEffect(() => {
-    if (integrityWarnings > 0 && (activeQuizId || takingQuiz)) {
-        if (integrityWarnings >= 3) {
-            alert("⚠️ تم اكتشاف محاولة غش متكررة. سيتم سحب ورقة الاختبار فوراً.");
-            forceSubmitQuiz();
-        } else {
-            alert(`⚠️ تحذير نزاهة: لقد غادرت الصفحة. (تحذير رقم ${integrityWarnings}/3)`);
-        }
+    if (scannerImage && canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.src = scannerImage;
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            if (ctx) ctx.drawImage(img, 0, 0);
+        };
     }
-  }, [integrityWarnings]);
+  }, [scannerImage]);
 
-  const forceSubmitQuiz = useCallback(() => {
-    if ((!activeQuizId && !takingQuiz) || !student) return;
-    const q = takingQuiz || quizzes.find(qx => qx.id === activeQuizId);
-    
-    onQuizSubmit({
-      id: 'qr' + Date.now(),
-      studentId: student.id,
-      quizId: q?.id || 'unknown',
-      quizTitle: q?.title || 'اختبار مجهول',
-      score: 0,
-      status: 'graded',
-      date: new Date().toLocaleDateString('ar-EG'),
-      feedback: "تم سحب الورقة تلقائياً بسبب محاولة الغش (نظام النزاهة)",
-      isCheatSuspected: true
-    });
-    setTakingQuiz(null);
-    setActiveQuizId(null);
-    setIntegrityWarnings(0);
-    setActiveTab('home');
-  }, [activeQuizId, takingQuiz, student, quizzes, onQuizSubmit]);
+  const isTargetForLive = useMemo(() => {
+      if (!settings.liveSessionActive) return false;
+      if (isTeacherPreview) return true;
+      if (!settings.liveSessionTargetYear || settings.liveSessionTargetYear === 'all') return true;
+      return settings.liveSessionTargetYear === student?.yearId;
+  }, [settings.liveSessionActive, settings.liveSessionTargetYear, student, isTeacherPreview]);
 
-  const handleAssignmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const jitsiEmbedUrl = useMemo(() => {
+      if (!settings.liveSessionLink) return '';
+      let base = settings.liveSessionLink;
+      if (base.includes('jit.si')) {
+          base = base.split('#')[0];
+          const params = [
+              `userInfo.displayName="${encodeURIComponent(student?.name || 'Guest')}"`,
+              `config.prejoinPageEnabled=false`,
+              `config.disableDeepLinking=true`, 
+              `interfaceConfig.MOBILE_APP_PROMO=false`,
+              `interfaceConfig.SHOW_JITSI_WATERMARK=false`
+          ];
+          return `${base}#${params.join('&')}`;
+      }
+      return base;
+  }, [settings.liveSessionLink, student]);
+
+  const jitsiAppUrl = useMemo(() => {
+      if (!settings.liveSessionLink) return '';
+      return settings.liveSessionLink.split('#')[0]; 
+  }, [settings.liveSessionLink]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setSubmissionFile(ev.target?.result as string);
-      reader.readAsDataURL(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setScannerImage(ev.target?.result as string);
+        };
+        reader.readAsDataURL(file);
     }
   };
 
-  const submitAssignment = () => {
-    if (!submissionFile || !selectedAssignment || !student) return alert('يرجى رفع ملف الحل أولاً');
+  const submitScannedHomework = () => {
+    if (!scannedAsgId || !canvasRef.current) return;
+    const finalImage = canvasRef.current.toDataURL('image/jpeg', 0.8);
+    submitAssignment(scannedAsgId, finalImage);
+    setShowScanner(false);
+    setScannerImage(null);
+    setScannedAsgId(null);
+  };
+
+  const submitBoardHomework = (dataUrl: string) => {
+    if (!solvingAsg) return;
+    submitAssignment(solvingAsg.id, dataUrl);
+    setShowBoard(false);
+    setSolvingAsg(null);
+  };
+
+  const submitAssignment = (asgId: string, fileUrl: string) => {
+    const assignment = assignments.find(a => a.id === asgId);
+    if (assignment && !isTeacherPreview && onSendNotification) {
+       const dueDate = new Date(assignment.dueDate);
+       dueDate.setHours(23, 59, 59, 999);
+       const now = new Date();
+       if (now > dueDate) {
+          onSendNotification({
+             title: '⚠️ تسليم واجب متأخر',
+             message: `قام الطالب "${student!.name}" بتسليم واجب "${assignment.title}" بعد الموعد المحدد.`,
+             type: 'urgent',
+             targetStudentId: 'teacher' 
+          });
+       }
+    }
+
     onAssignmentSubmit({
-      assignmentId: selectedAssignment.id,
-      studentId: student.id,
-      studentName: student.name,
-      fileUrl: submissionFile,
+        assignmentId: asgId,
+        studentId: student!.id,
+        studentName: student!.name,
+        fileUrl: fileUrl
     });
     alert('تم تسليم الواجب بنجاح! 🚀');
-    setSelectedAssignment(null);
-    setSubmissionFile('');
   };
 
-  const finishQuiz = () => {
-    if (!takingQuiz || !student) return;
-    
-    // Calculate Score (Simple Mock Logic - In real app, compare with correct answers)
-    // Here we just count answered questions as a mock score for demo
-    const answeredCount = Object.keys(quizAnswers).length;
-    const totalQuestions = takingQuiz.questions?.length || 1;
-    const score = Math.round((answeredCount / totalQuestions) * 100);
+  const handleStartQuiz = (quiz: Quiz) => {
+      setActiveQuiz(quiz);
+      setActiveQuizAnswers({});
+      setCheatWarnings(0);
+  };
 
-    onQuizSubmit({
-      id: 'qr' + Date.now(),
-      studentId: student.id,
-      quizId: takingQuiz.id,
-      quizTitle: takingQuiz.title,
-      score: score,
-      status: 'pending', // Pending teacher review
-      date: new Date().toLocaleDateString('ar-EG'),
+  const submitQuiz = () => {
+      if (!activeQuiz) return;
+      let score = 0;
+      let total = 0;
+      const attempts: QuestionAttempt[] = [];
+
+      activeQuiz.questions?.forEach((q, idx) => {
+          total += q.points;
+          const userAns = activeQuizAnswers[q.id];
+          const isCorrect = userAns === q.options?.[q.correctAnswer as number];
+          if (isCorrect) score += q.points;
+          
+          attempts.push({
+              questionId: q.id,
+              questionText: q.question,
+              userAnswer: userAns || 'لم يجب',
+              correctAnswer: q.options?.[q.correctAnswer as number] || '',
+              isCorrect: isCorrect
+          });
+      });
+
+      const finalPercentage = total > 0 ? Math.round((score / total) * 100) : 0;
+      
+      onQuizSubmit({
+          id: 'res' + Date.now(),
+          studentId: student!.id,
+          quizId: activeQuiz.id,
+          quizTitle: activeQuiz.title,
+          score: finalPercentage,
+          status: 'graded',
+          date: new Date().toLocaleDateString('ar-EG'),
+          cheatWarnings: cheatWarnings,
+          isCheatSuspected: cheatWarnings > 2,
+          attempts: attempts
+      });
+
+      if (onUpdateStudent) {
+          onUpdateStudent({ points: (student!.points || 0) + (finalPercentage > 80 ? 20 : 5) });
+      }
+
+      setActiveQuiz(null);
+      alert(`تم إنهاء الاختبار. نتيجتك: ${finalPercentage}%`);
+  };
+
+  if (!student) return null;
+
+  const level = Math.floor(student.points / 1000) + 1;
+  
+  const filterBySubject = (items: any[]) => {
+    if (selectedSubject === 'all') return items;
+    const subjectName = SUBJECTS.find(s => s.id === selectedSubject)?.name || '';
+    return items.filter(item => {
+      const text = (item.title || item.name || item.description || '').toLowerCase();
+      const itemSubject = item.subject || '';
+      return text.includes(subjectName) || itemSubject.includes(subjectName);
     });
-
-    setTakingQuiz(null);
-    setQuizAnswers({});
-    setIntegrityWarnings(0);
-    alert(`تم إنهاء الاختبار! نتيجتك المبدئية: ${score}% (سيتم مراجعتها من قبل المعلم)`);
   };
 
-  const updateIcon = (tabId: string, icon: string) => {
-    if (!onUpdateStudent || !student) return;
-    const newIcons = { ...student.preferences?.customIcons, [tabId]: icon };
-    onUpdateStudent({ preferences: { ...student.preferences, customIcons: newIcons } });
-  };
+  const filteredAssignments = filterBySubject(assignments).filter(a => 
+    isTeacherPreview || a.yearId === student.yearId
+  );
+  
+  const pendingAssignments = isTeacherPreview 
+    ? filteredAssignments.filter(a => a.status === 'active')
+    : filteredAssignments.filter(a => a.status === 'active' && !submissions.find(s => s.assignmentId === a.id));
 
-  if (!student || student.id === 'guest_login' || student.id === 'guest') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1e] p-6 font-['Cairo'] relative overflow-hidden text-right antialiased" dir="rtl">
-        <div className="absolute inset-0 opacity-10 pointer-events-none overflow-hidden">
-           <div className="absolute top-[-10%] right-[-10%] text-[40rem] font-black" style={{color: primaryColor}}>∑</div>
-        </div>
-        <div className="max-w-md w-full bg-white p-10 md:p-14 rounded-[4rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] text-center space-y-10 animate-slideUp relative z-10 border border-white/10">
-           {settings.branding.logoUrl ? (
-             <img src={settings.branding.logoUrl} className="h-24 mx-auto object-contain" alt="Logo" />
-           ) : (
-             <div className="w-24 h-24 rounded-[2.5rem] mx-auto flex items-center justify-center text-white text-5xl font-black rotate-3" style={{ background: primaryColor }}>∑</div>
-           )}
-           <div className="space-y-3">
-             <h2 className="text-4xl font-black text-slate-800 tracking-tighter">بوابة المتميزين</h2>
-             <p className="text-slate-500 font-medium text-lg leading-relaxed">أهلاً بك يا بطل، أدخل كود اشتراكك للوصول لمحتواك التعليمي.</p>
-           </div>
-           <div className="space-y-4">
-              <input 
-                type="text" 
-                placeholder="الكود الشخصي (مثلاً: M3-123)" 
-                className="w-full px-8 py-6 bg-slate-50 border-2 border-transparent focus:border-blue-600 rounded-[2rem] font-bold text-center text-2xl outline-none transition-all shadow-inner uppercase tracking-widest text-slate-800" 
-                value={loginCode} 
-                onChange={e => setLoginCode(e.target.value.toUpperCase())} 
-              />
-              <button onClick={() => onLogin(loginCode)} className="w-full py-6 text-white rounded-[2rem] font-black text-lg shadow-xl transition-all transform active:scale-95" style={{ backgroundColor: primaryColor }}>بدء رحلة التفوق 🚀</button>
-           </div>
-           <button onClick={onBack} className="text-slate-400 font-bold text-xs hover:text-blue-600 transition-colors py-2">← العودة للرئيسية</button>
-        </div>
-      </div>
-    );
-  }
+  const filteredQuizzes = filterBySubject(quizzes).filter(q => 
+    isTeacherPreview || q.yearId === student.yearId
+  );
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'home':
-        return (
-           <div className="space-y-10 animate-fadeIn">
-              {/* Premium Hero */}
-              <div className="rounded-[4rem] p-10 md:p-16 text-white relative overflow-hidden shadow-2xl border border-white/5" style={{ backgroundColor: '#0f172a' }}>
-                <div className="absolute top-0 right-0 w-full h-full opacity-60" style={{ background: `radial-gradient(circle at 15% 25%, ${primaryColor}20, transparent 65%)` }}></div>
-                
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-12">
-                  <div className="space-y-6 text-center md:text-right flex-1">
-                    <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 backdrop-blur-2xl rounded-full border border-white/10">
-                       <span className="w-2 h-2 rounded-full animate-pulse shadow-[0_0_10px_#34d399]" style={{ backgroundColor: '#10b981' }}></span>
-                       <span className="text-[10px] font-black text-blue-200 uppercase tracking-[0.3em]">حساب الطالب مفعل</span>
-                    </div>
-                    <h2 className="text-5xl md:text-7xl font-black leading-tight tracking-tighter">
-                      {settings.contentTexts.studentWelcomeTitle || 'مرحباً يا بطل'} <br/>
-                      <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(to right, #60a5fa, #818cf8, #c084fc)` }}>{student.name.split(' ')[0]} 👋</span>
-                    </h2>
-                    <p className="text-slate-400 font-medium text-lg md:text-xl max-w-xl leading-relaxed">
-                      {settings.contentTexts.studentWelcomeSubtitle || settings.studentWelcomeMsg}
-                    </p>
-                  </div>
-                  
-                  <div className="relative">
-                    <button 
-                      onClick={() => canSpin ? setShowWheel(true) : alert('لقد استهلكت فرصتك اليوم، عد غداً! ⏳')}
-                      className={`relative w-56 h-56 rounded-[3.5rem] border-4 transition-all duration-700 group flex flex-col items-center justify-center gap-4 overflow-hidden ${canSpin ? 'hover:scale-105 hover:rotate-2' : 'grayscale opacity-40'}`}
-                      style={{ backgroundColor: canSpin ? secondaryColor : 'rgba(255,255,255,0.05)', borderColor: canSpin ? '#fbbf24' : 'rgba(255,255,255,0.1)' }}
-                    >
-                       <span className="text-7xl group-hover:scale-110 transition-transform duration-500 drop-shadow-xl">🎡</span>
-                       <div className="text-center px-4">
-                          <p className="text-[11px] font-black text-white uppercase tracking-widest">عجلة الحظ</p>
-                          <p className="text-[8px] font-bold text-amber-100 uppercase mt-1 opacity-80">اربح نقاطاً مجانية</p>
-                       </div>
-                    </button>
-                  </div>
-                </div>
-              </div>
+  const filteredVideos = filterBySubject(videoLessons).filter(v => 
+    (!libraryTerm || libraryTerm === 'all' || v.term === libraryTerm) &&
+    (isTeacherPreview || v.yearId === student.yearId || v.yearId === 'all')
+  );
 
-              {/* Stats Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                 {[
-                   { label: 'رصيد النقاط', val: student.points, icon: '✨', color: secondaryColor },
-                   { label: 'نسبة الإنجاز', val: `${student.score}%`, icon: '📈', color: primaryColor },
-                   { label: 'واجبات مسلمة', val: submissions.length, icon: '📚', color: '#6366f1' },
-                   { label: 'محاضرات منجزة', val: videoLessons.length, icon: '🎬', color: '#10b981' },
-                 ].map((stat, i) => (
-                   <div key={i} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center gap-3 group hover:shadow-xl hover:translate-y-[-5px] transition-all">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform" style={{ color: stat.color, backgroundColor: `${stat.color}15` }}>{stat.icon}</div>
-                      <div className="text-center">
-                        <p className={`text-3xl font-black text-slate-800`}>{stat.val}</p>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                      </div>
+  const filteredDocs = filterBySubject(educationalSources).filter(s => 
+    !s.isAiReference && (!libraryTerm || libraryTerm === 'all' || s.term === libraryTerm) &&
+    (isTeacherPreview || s.yearId === student.yearId || s.yearId === 'all')
+  );
+  
+  const SidebarItem: React.FC<{ id: string; label: string; icon: string; active: boolean }> = ({ id, label, icon, active }) => (
+    <button 
+      onClick={() => setActiveTab(id as any)}
+      className={`w-full flex items-center gap-4 px-6 py-4 transition-all duration-300 border-r-4 ${
+        active 
+          ? 'bg-white/10 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]' 
+          : 'border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200'
+      }`}
+    >
+      <span className={`text-xl transition-transform ${active ? 'scale-110' : ''}`}>{icon}</span>
+      <span className={`text-sm ${active ? 'font-black' : 'font-medium'}`}>{label}</span>
+    </button>
+  );
+
+  const renderDashboard = () => (
+    <div className="space-y-8 animate-fadeIn pb-24">
+       {isTargetForLive && (
+           <div className="bg-red-600 rounded-[2.5rem] p-6 text-white shadow-xl animate-pulse cursor-pointer flex items-center justify-between gap-4" onClick={() => setShowLiveStream(true)}>
+               <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-ping absolute"></div>
+                   <div className="w-12 h-12 bg-white text-red-600 rounded-full flex items-center justify-center text-2xl font-black relative z-10">📹</div>
+                   <div>
+                       <h3 className="font-black text-lg">بث مباشر الآن</h3>
+                       <p className="text-xs font-bold text-red-100">اضغط للانضمام فوراً</p>
                    </div>
-                 ))}
-              </div>
+               </div>
+               <button className="bg-white text-red-600 px-6 py-3 rounded-2xl font-black text-xs shadow-lg whitespace-nowrap hover:scale-105 transition-transform">انضم الآن ▶</button>
            </div>
-        );
-      
-      case 'lessons':
-        return (
-          <div className="space-y-10 animate-fadeIn">
-            <header className="px-6">
-                <h2 className="text-4xl font-black text-slate-800 tracking-tighter leading-tight">مكتبة الفيديو 🎬</h2>
-            </header>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-              {videoLessons.filter(v => v.yearId === student.yearId || v.yearId === 'all').map(video => (
-                <div key={video.id} onClick={() => setSelectedVideo(video)} className="bg-white rounded-[3.5rem] overflow-hidden shadow-sm border border-slate-100 group cursor-pointer hover:shadow-2xl transition-all duration-500">
-                  <div className="aspect-video relative overflow-hidden bg-slate-900">
-                     <img src={`https://img.youtube.com/vi/${video.youtubeUrl.split('v=')[1]?.split('&')[0]}/hqdefault.jpg`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
-                     <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl shadow-2xl scale-75 group-hover:scale-100 transition-all duration-500" style={{ backgroundColor: primaryColor }}>▶</div>
-                     </div>
-                  </div>
-                  <div className="p-8 space-y-4">
-                    <h4 className="font-bold text-slate-800 text-xl leading-snug group-hover:text-blue-600 transition-colors">{video.title}</h4>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+       )}
 
-      case 'library':
-        return (
-          <div className="space-y-10 animate-fadeIn">
-             <header className="px-6">
-                <h2 className="text-4xl font-black text-slate-800 tracking-tighter leading-tight">المكتبة الرقمية 📁</h2>
-                <p className="text-slate-400 font-medium mt-2">المذكرات، المراجعات، والملفات التعليمية.</p>
-             </header>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {educationalSources.filter(src => src.yearId === student.yearId || src.yearId === 'all').map(src => (
-                  <div key={src.id} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex items-center gap-6 group hover:shadow-lg transition-all">
-                     <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform">📄</div>
-                     <div className="flex-1 overflow-hidden">
-                        <h4 className="font-bold text-slate-800 text-base truncate">{src.name}</h4>
-                        <p className="text-xs text-slate-500 font-medium mt-1">{src.uploadDate}</p>
-                     </div>
-                     <a href={src.data} download={src.name} className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">⬇</a>
-                  </div>
-                ))}
-                {educationalSources.filter(src => src.yearId === student.yearId || src.yearId === 'all').length === 0 && (
-                   <div className="col-span-full py-20 text-center opacity-30">
-                      <span className="text-6xl block mb-4">📂</span>
-                      <p className="font-black text-slate-400">لا توجد ملفات حالياً</p>
-                   </div>
-                )}
-             </div>
-          </div>
-        );
-
-      case 'quizzes':
-        return (
-          <div className="space-y-12 animate-fadeIn">
-             {/* Assignments Section */}
-             <section>
-               <header className="px-6 mb-6 flex justify-between items-center">
-                  <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                    <span>📝</span> الواجبات المدرسية
-                  </h3>
-               </header>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {assignments.filter(a => a.status === 'active' && a.yearId === student.yearId).map(asg => {
-                    const isSubmitted = submissions.some(s => s.assignmentId === asg.id && s.studentId === student.id);
-                    return (
-                      <div key={asg.id} className={`p-8 rounded-[3rem] border-2 transition-all ${isSubmitted ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100 shadow-sm'}`}>
-                         <div className="flex justify-between items-start mb-4">
-                            <div>
-                               <h4 className="font-bold text-xl text-slate-800 mb-1">{asg.title}</h4>
-                               <p className="text-xs text-slate-500 font-medium">آخر موعد: {asg.dueDate}</p>
-                            </div>
-                            {isSubmitted ? (
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-lg text-[9px] font-black">تم التسليم ✓</span>
-                            ) : (
-                              <span className="px-3 py-1 bg-amber-100 text-amber-600 rounded-lg text-[9px] font-black">مطلوب</span>
-                            )}
-                         </div>
-                         {!isSubmitted && (
-                           <button onClick={() => setSelectedAssignment(asg)} className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg hover:scale-[1.02] transition-all">
-                             عرض التفاصيل والتسليم 📤
-                           </button>
-                         )}
-                      </div>
-                    );
-                  })}
-                  {assignments.filter(a => a.status === 'active' && a.yearId === student.yearId).length === 0 && (
-                    <div className="col-span-full py-10 text-center text-slate-400 font-bold text-sm bg-slate-50 rounded-[2rem]">لا توجد واجبات نشطة حالياً ✨</div>
-                  )}
-               </div>
-             </section>
-
-             {/* Quizzes Section */}
-             <section>
-               <header className="px-6 mb-6 flex justify-between items-center">
-                  <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                    <span>⚡</span> الاختبارات الإلكترونية
-                  </h3>
-               </header>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {quizzes.filter(q => q.yearId === student.yearId).map(quiz => {
-                    const result = results.find(r => r.quizId === quiz.id && r.studentId === student.id);
-                    return (
-                      <div key={quiz.id} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 relative overflow-hidden group">
-                         <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
-                         <h4 className="font-bold text-xl text-slate-800 mb-2">{quiz.title}</h4>
-                         <div className="flex justify-between items-center">
-                            <span className="text-xs text-slate-500 font-medium">{quiz.date}</span>
-                            {result ? (
-                              <span className="font-black text-emerald-600 text-sm">الدرجة: {result.score}%</span>
-                            ) : (
-                              <button onClick={() => { setTakingQuiz(quiz); setActiveQuizId(quiz.id); }} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black hover:bg-indigo-700 transition-all shadow-lg">
-                                 بدء الاختبار الآن ⚡
-                              </button>
-                            )}
-                         </div>
-                      </div>
-                    );
-                  })}
-                  {quizzes.filter(q => q.yearId === student.yearId).length === 0 && (
-                    <div className="col-span-full py-10 text-center text-slate-400 font-bold text-sm bg-slate-50 rounded-[2rem]">لا توجد اختبارات متاحة حالياً ✨</div>
-                  )}
-               </div>
-             </section>
-          </div>
-        );
-      
-      case 'chat': return <ChatRoom user={{...student, role: 'student'}} messages={messages} years={years} students={students} onSendMessage={onSendMessage} notation={settings.mathNotation} />;
-      case 'rewards': return <Rewards rewards={rewards} redemptions={redemptions} student={student} role="student" onAddReward={()=>{}} onDeleteReward={()=>{}} onRedeem={onRedeemReward} onMarkDelivered={()=>{}} />;
-      case 'notifications': return <Notifications notifications={notifications} years={years} groups={groups} role="student" currentStudentId={student.id} currentYearId={student.yearId} onMarkRead={onMarkNotificationRead} onSend={()=>{}} />;
-      case 'ai_solver': return <AISolver notation={settings.mathNotation} />;
-      
-      default: return (
-         <div className="py-32 text-center font-black text-slate-300 text-xl animate-pulse">جاري تحميل القسم...</div>
-      );
-    }
-  };
-
-  return (
-    <div className={`min-h-screen bg-[#f8fafc] pb-44 font-['Cairo'] text-right relative antialiased ${settings.integrityMode ? 'select-none' : ''}`} dir="rtl">
-      
-      {/* Integrity Mode Blur Overlay */}
-      {isBlurred && settings.integrityMode && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/95 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-8 animate-fadeIn">
-           <div className="w-24 h-24 bg-rose-600 rounded-[2.5rem] flex items-center justify-center text-5xl mb-8 shadow-2xl animate-bounce">🛡️</div>
-           <h2 className="text-4xl font-black text-white mb-4">وضع النزاهة نشط</h2>
-           <p className="text-slate-400 text-lg font-bold max-w-md leading-relaxed">
-             تم إخفاء المحتوى لأنك غادرت الصفحة أو فقدت التركيز. يرجى العودة للتطبيق لمتابعة العمل.
-           </p>
-           {(activeQuizId || takingQuiz) && (
-             <p className="mt-8 text-rose-400 font-black text-sm bg-rose-500/10 px-6 py-3 rounded-2xl border border-rose-500/20">
-               ⚠️ تحذير: محاولة الغش المتكررة ستؤدي لإنهاء الاختبار تلقائياً.
-             </p>
-           )}
-        </div>
-      )}
-
-      {/* Navbar */}
-      <nav className="sticky top-0 z-[200] px-6 py-5 bg-white/80 backdrop-blur-2xl border-b border-slate-100 flex justify-between items-center shadow-sm">
-          <div className="flex items-center gap-5">
-             <div className="relative group cursor-pointer">
-                <img src={student.avatar} className="w-14 h-14 rounded-[1.8rem] border-4 border-white shadow-xl object-cover" alt="" />
-             </div>
-             <div>
-                <h3 className="font-black text-slate-900 text-base leading-none mb-1.5">{student.name}</h3>
-                <span className="text-[10px] font-black text-white px-3 py-1 rounded-lg shadow-sm uppercase tracking-widest" style={{ backgroundColor: primaryColor }}>{student.points} Points</span>
-             </div>
+       <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-slate-900 to-indigo-950 p-8 border border-white/10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 group">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+          <div className="relative z-10 space-y-2 text-center md:text-right">
+             <h2 className="text-2xl md:text-4xl font-black text-white">مرحباً، {student.name.split(' ')[0]} 👋</h2>
+             <p className="text-slate-400 text-sm font-medium">لديك <span className="text-amber-400 font-bold border-b border-amber-500/50">{pendingAssignments.length} واجبات</span> جديدة بانتظارك اليوم.</p>
           </div>
           
-          <div className="flex items-center gap-4">
-            {notifPermission !== 'granted' && (
-              <button 
-                onClick={requestNotificationPermission}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all"
-                title="تفعيل الإشعارات"
-              >
-                <span className="text-xl">🔔</span>
-                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">تفعيل التنبيهات</span>
-              </button>
-            )}
-
-            <button 
-              onClick={() => setShowIconPicker(true)} 
-              className="w-12 h-12 bg-slate-50 text-slate-400 rounded-[1.2rem] flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all"
-              title="تخصيص الأيقونات"
-            >
-               <span className="text-xl">🎨</span>
-            </button>
-
-            {settings.integrityMode && (
-               <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">محمي</span>
-               </div>
-            )}
-            <button 
-              onClick={() => setActiveTab('notifications')} 
-              className={`relative w-12 h-12 rounded-[1.2rem] flex items-center justify-center transition-all duration-300 ${activeTab === 'notifications' ? 'text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-white'}`}
-              style={activeTab === 'notifications' ? { backgroundColor: primaryColor } : {}}
-            >
-               <span className="text-2xl">🔔</span>
-               {unreadCount > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-6 px-1.5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center border-4 border-white shadow-xl animate-bounce">{unreadCount}</span>}
-            </button>
-            <button onClick={onBack} className="px-8 py-3.5 bg-slate-950 text-white rounded-2xl text-[11px] font-black hover:bg-black transition-all">خروج</button>
+          <div className="relative z-10 flex gap-6 items-center bg-white/5 backdrop-blur-md px-8 py-4 rounded-2xl border border-white/10 shadow-lg">
+             <div className="text-center">
+                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">المستوى</p>
+                <p className="text-2xl font-black text-white">{level}</p>
+             </div>
+             <div className="w-px h-10 bg-white/10"></div>
+             <div className="text-center">
+                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">النقاط</p>
+                <p className="text-2xl font-black text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]">{student.points}</p>
+             </div>
           </div>
-      </nav>
+       </div>
 
-      <main className="max-w-7xl mx-auto p-8 md:p-12 min-h-[60vh]">
-         {selectedVideo ? (
-            <div className="space-y-10 animate-fadeIn max-w-5xl mx-auto">
-               <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl gap-6">
-                  <div>
-                    <h4 className="font-black text-2xl text-slate-900 leading-tight">{selectedVideo.title}</h4>
-                  </div>
-                  <button onClick={() => setSelectedVideo(null)} className="px-10 py-4 bg-slate-950 text-white rounded-2xl font-black text-[11px] hover:bg-black transition-all"><span>←</span> القائمة الرئيسية</button>
-               </div>
-               <div className="w-full">
-                  <ProtectedVideo src={selectedVideo.youtubeUrl} title={selectedVideo.title} watermarkText={`${student.name} | ${student.studentCode}`} enabled={settings.watermarkEnabled} />
+       <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-6 min-h-[300px]">
+          <h3 className="font-black text-white text-lg mb-4 flex items-center gap-2"><span>📌</span> المهام العاجلة</h3>
+          {pendingAssignments.length > 0 ? (
+             <div className="space-y-4">
+                {pendingAssignments.slice(0, 4).map(asg => (
+                   <div key={asg.id} className="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors rounded-xl flex items-center justify-between group">
+                      <div>
+                         <div className="flex gap-2 mb-1">
+                            <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">عاجل</span>
+                            <span className="text-[9px] font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded">{asg.dueDate}</span>
+                         </div>
+                         <h4 className="font-bold text-slate-200 text-sm">{asg.title}</h4>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab('assignments')}
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-black transition-all shadow-lg"
+                      >
+                        حل ⚡
+                      </button>
+                   </div>
+                ))}
+             </div>
+          ) : (
+             <div className="text-center py-12 opacity-60"><p className="text-slate-400 font-bold">لا توجد مهام جديدة</p></div>
+          )}
+       </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#0f172a] flex flex-col lg:flex-row font-['Cairo'] text-right overflow-hidden selection:bg-amber-500/30 selection:text-amber-100" dir="rtl">
+      
+      <aside className="hidden lg:flex w-64 bg-[#0f172a] border-l border-white/5 h-screen sticky top-0 flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.5)]">
+         <div className="p-8 border-b border-white/5 mb-2 bg-[#1e293b]/30">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-600 text-white rounded-xl flex items-center justify-center text-xl font-black shadow-[0_0_15px_rgba(245,158,11,0.3)]">∑</div>
+               <div>
+                  <h1 className="font-black text-white text-lg leading-none tracking-tight">{settings.platformName}</h1>
                </div>
             </div>
-         ) : renderContent()}
-      </main>
-
-      {/* Assignment Submission Modal */}
-      {selectedAssignment && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
-           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md animate-fadeIn" onClick={() => setSelectedAssignment(null)}></div>
-           <div className="bg-white w-full max-w-2xl p-10 rounded-[3.5rem] relative z-10 animate-slideUp shadow-2xl overflow-y-auto max-h-[90vh]">
-              <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-2xl font-black text-slate-800">تسليم الواجب</h3>
-                 <button onClick={() => setSelectedAssignment(null)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all">✕</button>
-              </div>
-              <div className="space-y-6">
-                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-                    <h4 className="font-bold text-xl text-slate-900 mb-4">{selectedAssignment.title}</h4>
-                    <div className="text-base font-medium text-slate-700 leading-loose">
-                       <MathRenderer content={selectedAssignment.description} />
-                    </div>
-                    {selectedAssignment.fileUrl && (
-                       <img src={selectedAssignment.fileUrl} className="w-full rounded-xl border border-slate-200 mt-4" alt="Assignment" />
-                    )}
-                    {selectedAssignment.externalLink && (
-                       <a href={selectedAssignment.externalLink} target="_blank" rel="noreferrer" className="block mt-4 text-center py-3 bg-blue-50 text-blue-600 rounded-xl font-black text-xs hover:bg-blue-100 transition-all">🔗 فتح الرابط الخارجي</a>
-                    )}
-                 </div>
-
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">إجابتك (رفع صورة)</label>
-                    <input type="file" accept="image/*" onChange={handleAssignmentUpload} className="w-full p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-blue-500 transition-all" />
-                    {submissionFile && (
-                       <div className="relative mt-2">
-                          <img src={submissionFile} className="h-32 rounded-xl border border-slate-200" alt="Preview" />
-                          <p className="text-[10px] text-emerald-600 font-bold mt-1">تم رفع الملف بنجاح ✓</p>
-                       </div>
-                    )}
-                 </div>
-
-                 <button onClick={submitAssignment} className="w-full py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-lg shadow-xl hover:scale-[1.02] transition-all">تأكيد التسليم 📤</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Quiz Taking Modal */}
-      {takingQuiz && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-4xl h-[90vh] rounded-[3.5rem] relative flex flex-col overflow-hidden shadow-2xl animate-slideUp">
-              <div className="p-8 bg-indigo-900 text-white flex justify-between items-center">
-                 <div>
-                    <h3 className="text-2xl font-black">{takingQuiz.title}</h3>
-                    <p className="text-sm font-medium text-indigo-200 opacity-90 mt-1">يرجى الإجابة بدقة، الوقت محسوب.</p>
-                 </div>
-                 <div className="px-4 py-2 bg-white/10 rounded-xl font-mono font-black text-lg">{Object.keys(quizAnswers).length} / {takingQuiz.questions?.length || 0}</div>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-8 space-y-10 no-scrollbar bg-slate-50">
-                 {takingQuiz.questions?.map((q: any, idx: number) => (
-                    <div key={q.id || idx} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                       <div className="flex gap-6 mb-6">
-                          <span className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-lg">{idx + 1}</span>
-                          <div className="flex-1 font-bold text-slate-800 text-xl leading-loose">
-                             <MathRenderer content={q.question} />
-                          </div>
-                       </div>
-                       
-                       {q.type === 'mcq' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mr-14">
-                             {q.options?.map((opt: string, oid: number) => (
-                               <label key={oid} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${quizAnswers[q.id] === opt ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 hover:border-slate-200'}`}>
-                                  <input 
-                                    type="radio" 
-                                    name={`q-${q.id}`} 
-                                    className="accent-indigo-600 w-6 h-6"
-                                    checked={quizAnswers[q.id] === opt}
-                                    onChange={() => setQuizAnswers({...quizAnswers, [q.id]: opt})}
-                                  />
-                                  <span className="font-medium text-slate-800 text-lg leading-relaxed"><MathRenderer content={opt} inline /></span>
-                               </label>
-                             ))}
-                          </div>
-                       )}
-                       
-                       {q.type !== 'mcq' && (
-                          <textarea 
-                            className="w-full p-6 mr-14 bg-slate-50 border-2 border-slate-200 rounded-3xl font-medium text-lg outline-none focus:border-indigo-600 leading-relaxed text-slate-800" 
-                            placeholder="اكتب إجابتك هنا..."
-                            value={quizAnswers[q.id] || ''}
-                            onChange={(e) => setQuizAnswers({...quizAnswers, [q.id]: e.target.value})}
-                          />
-                       )}
-                    </div>
-                 ))}
-                 {(!takingQuiz.questions || takingQuiz.questions.length === 0) && (
-                    <div className="text-center py-20 text-slate-400 font-bold">لا توجد أسئلة في هذا الاختبار.</div>
-                 )}
-              </div>
-
-              <div className="p-6 bg-white border-t border-slate-100 flex justify-between items-center">
-                 <button onClick={() => { setTakingQuiz(null); setQuizAnswers({}); setActiveQuizId(null); }} className="px-8 py-4 text-slate-400 font-black hover:text-rose-500 transition-all">إلغاء وخروج</button>
-                 <button onClick={finishQuiz} className="px-12 py-4 bg-emerald-600 text-white rounded-[2rem] font-black text-lg shadow-xl hover:scale-105 transition-all">إنهاء الاختبار ✅</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {showWheel && (
-        <LuckyWheel 
-          onWin={(p) => { onSpinWin?.(p); setShowWheel(false); }}
-          onClose={() => setShowWheel(false)}
-        />
-      )}
-
-      {/* Icon Picker Modal */}
-      {showIconPicker && (
-        <div className="fixed inset-0 z-[800] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
-           <div className="bg-white w-full max-w-lg rounded-[3rem] p-8 shadow-2xl relative animate-slideUp">
-              <div className="flex justify-between items-center mb-6">
-                 <div>
-                    <h3 className="text-2xl font-black text-slate-800">تخصيص الواجهة 🎨</h3>
-                    <p className="text-slate-400 font-bold text-xs mt-1">اختر الأيقونات المفضلة لكل قسم</p>
-                 </div>
-                 <button onClick={() => setShowIconPicker(false)} className="w-10 h-10 bg-slate-50 rounded-xl text-slate-400 hover:text-rose-500 transition-all">✕</button>
-              </div>
-
-              <div className="flex bg-slate-50 p-1.5 rounded-2xl mb-6 overflow-x-auto no-scrollbar">
-                 {Object.keys(DEFAULT_ICONS).map(key => (
-                   <button 
-                     key={key} 
-                     onClick={() => setActiveIconTab(key)}
-                     className={`flex-1 py-3 px-4 rounded-xl text-xs font-black whitespace-nowrap transition-all ${activeIconTab === key ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     {userIcons[key as keyof typeof userIcons]} {key === 'home' ? 'الرئيسية' : key === 'lessons' ? 'الدروس' : key === 'library' ? 'المكتبة' : key === 'quizzes' ? 'المهام' : 'النقاش'}
-                   </button>
-                 ))}
-              </div>
-
-              <div className="grid grid-cols-6 gap-3 max-h-60 overflow-y-auto no-scrollbar p-2">
-                 {ICON_OPTIONS.map(icon => (
-                   <button 
-                     key={icon}
-                     onClick={() => updateIcon(activeIconTab, icon)}
-                     className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all ${userIcons[activeIconTab as keyof typeof userIcons] === icon ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-slate-50 hover:bg-slate-100'}`}
-                   >
-                     {icon}
-                   </button>
-                 ))}
-              </div>
-              
-              <div className="mt-6 pt-6 border-t border-slate-100 flex justify-end">
-                 <button onClick={() => setShowIconPicker(false)} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-black transition-all">تم الحفظ ✓</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Floating Bottom Nav */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] w-[95%] max-w-4xl">
-         <nav className="bg-[#0f172a]/95 backdrop-blur-3xl rounded-[3.5rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] border border-white/10 p-2.5 flex justify-around items-center h-24 overflow-x-auto no-scrollbar">
-            {[
-              { id: 'home', i: userIcons.home, l: 'الرئيسية' },
-              { id: 'lessons', i: userIcons.lessons, l: 'المحاضرات' },
-              { id: 'library', i: userIcons.library, l: 'المكتبة' },
-              { id: 'quizzes', i: userIcons.quizzes, l: 'المهام' },
-              { id: 'chat', i: userIcons.chat, l: 'النقاش' },
-            ].map(tab => (
-              <button 
-                key={tab.id} 
-                onClick={() => { setActiveTab(tab.id); setSelectedVideo(null); }} 
-                className={`flex-1 flex flex-col items-center justify-center rounded-[2.5rem] h-full min-w-[70px] transition-all duration-500 relative ${activeTab === tab.id ? 'text-white scale-110 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                style={activeTab === tab.id ? { backgroundColor: primaryColor } : {}}
-              >
-                <span className="text-2xl mb-1.5 drop-shadow-md">{tab.i}</span>
-                <span className="text-[8px] font-black uppercase tracking-tighter">{tab.l}</span>
-              </button>
+         </div>
+         <nav className="flex-1 py-4 space-y-2 px-2">
+            {sidebarTabs.map(tab => (
+               <SidebarItem key={tab.id} id={tab.id} label={tab.label} icon={tab.icon} active={activeTab === tab.id} />
             ))}
          </nav>
+         <div className="p-4 border-t border-white/5 bg-[#1e293b]/50 backdrop-blur-sm">
+            <div className="flex items-center gap-3 mb-4">
+               <img src={student.avatar} className="w-10 h-10 rounded-full border-2 border-amber-500/50" alt="" />
+               <div className="flex-1 overflow-hidden">
+                  <p className="font-bold text-white text-xs truncate">{student.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{student.studentCode}</p>
+               </div>
+            </div>
+            <button onClick={onBack} className="w-full py-2 bg-white/5 border border-white/10 text-rose-400 rounded-xl text-xs font-bold hover:bg-rose-500/10 hover:border-rose-500/30 transition-all">
+               تسجيل الخروج
+            </button>
+         </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+         <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+         <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] bg-amber-600/5 blur-[100px] rounded-full pointer-events-none"></div>
+
+         <div className="lg:hidden bg-[#0f172a]/90 backdrop-blur-md p-4 flex justify-between items-center border-b border-white/10 sticky top-0 z-30 shadow-lg">
+            <div className="flex items-center gap-3">
+               <div className="w-8 h-8 bg-amber-500 text-white rounded-lg flex items-center justify-center text-lg font-black">∑</div>
+               <span className="font-black text-white text-sm">{sidebarTabs.find(t=>t.id===activeTab)?.label}</span>
+            </div>
+            <button onClick={onBack} className="text-slate-400 hover:text-rose-500 text-sm font-bold bg-white/5 px-3 py-1 rounded-lg">خروج</button>
+         </div>
+
+         <main className="flex-1 overflow-y-auto p-4 md:p-10 no-scrollbar relative z-10">
+            <div className="max-w-6xl mx-auto w-full pb-24">
+               {activeTab === 'dashboard' && renderDashboard()}
+               {activeTab === 'library' && (
+                   <div className="space-y-6 pb-24 animate-fadeIn">
+                       <h2 className="text-2xl font-black text-white">مكتبتي التعليمية</h2>
+                       <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+                           <button onClick={() => setLibraryFilter('video')} className={`px-4 py-2 rounded-xl text-xs font-bold ${libraryFilter === 'video' ? 'bg-amber-500 text-white' : 'bg-white/10 text-slate-400'}`}>فيديوهات 🎬</button>
+                           <button onClick={() => setLibraryFilter('doc')} className={`px-4 py-2 rounded-xl text-xs font-bold ${libraryFilter === 'doc' ? 'bg-amber-500 text-white' : 'bg-white/10 text-slate-400'}`}>كتب وملازم 📚</button>
+                       </div>
+                       
+                       {libraryFilter === 'video' ? (
+                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                               {filteredVideos.map(vid => (
+                                   <div key={vid.id} onClick={() => setSelectedVideo(vid)} className="bg-[#1e293b] rounded-[2rem] overflow-hidden border border-white/5 hover:border-indigo-500/50 transition-all cursor-pointer group shadow-lg">
+                                       <div className="relative aspect-video bg-black/50">
+                                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-900 to-slate-900"><span className="text-4xl opacity-50">▶</span></div>
+                                           <div className="absolute top-2 left-2"><span className="bg-black/50 text-white px-2 py-0.5 rounded text-[8px] font-bold">ترم {vid.term}</span></div>
+                                       </div>
+                                       <div className="p-5">
+                                           <h3 className="text-white font-bold text-sm mb-1 line-clamp-2">{vid.title}</h3>
+                                       </div>
+                                   </div>
+                               ))}
+                           </div>
+                       ) : (
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               {filteredDocs.map(doc => (
+                                   <div key={doc.id} className="bg-white/5 p-5 rounded-3xl border border-white/5 flex items-center gap-4">
+                                       <div className="text-2xl">📄</div>
+                                       <div className="flex-1">
+                                           <h3 className="text-white font-bold text-sm truncate">{doc.name}</h3>
+                                           <span className="text-slate-400 text-[9px]">{doc.uploadDate}</span>
+                                       </div>
+                                       <a href={doc.data} download={doc.name} className="bg-white/10 w-10 h-10 rounded-full flex items-center justify-center text-white">⬇</a>
+                                   </div>
+                               ))}
+                           </div>
+                       )}
+                   </div>
+               )}
+
+               {activeTab === 'assignments' && (
+                  <div className="space-y-6 pb-24 animate-fadeIn">
+                     <h2 className="text-2xl font-black text-white border-b border-white/10 pb-4 mb-6">واجباتي المدرسية</h2>
+                     <div className="flex flex-col gap-3">
+                        {filteredAssignments.length > 0 ? filteredAssignments.map(asg => {
+                           const isSubmitted = submissions.find(s => s.assignmentId === asg.id);
+                           const isBoardAssignment = asg.fileUrl && !asg.externalLink; 
+                           
+                           return (
+                              <div key={asg.id} className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/5 hover:border-indigo-500/50 hover:bg-white/10 transition-all group flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+                                 <div className="flex items-start gap-4">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 ${isSubmitted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{isSubmitted ? '✓' : '📝'}</div>
+                                    <div>
+                                       <h3 className="font-bold text-white text-base mb-1">{asg.title}</h3>
+                                       <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                                          <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">{SUBJECTS.find(s => asg.title.includes(s.name))?.name || 'عام'}</span>
+                                          <span className={`${!isSubmitted && 'text-rose-400 font-bold'}`}>تسليم: {asg.dueDate}</span>
+                                       </div>
+                                    </div>
+                                 </div>
+                                 
+                                 {!isSubmitted && (
+                                     <div className="flex gap-2 w-full md:w-auto">
+                                         {/* Board Solve Option */}
+                                         {isBoardAssignment && (
+                                             <button 
+                                                onClick={() => { setSolvingAsg(asg); setShowBoard(true); }}
+                                                className="flex-1 md:flex-none px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2"
+                                             >
+                                                <span>حل على السبورة</span>
+                                                <span>🎨</span>
+                                             </button>
+                                         )}
+                                         
+                                         {/* Default Upload Option */}
+                                         <button 
+                                            onClick={() => { setScannedAsgId(asg.id); setShowScanner(true); }} 
+                                            className="flex-1 md:flex-none px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2"
+                                         >
+                                            <span>رفع صورة الحل</span>
+                                            <span>📸</span>
+                                         </button>
+                                     </div>
+                                 )}
+                                 
+                                 {isSubmitted && (
+                                     <button disabled className="px-8 py-3 bg-white/5 text-slate-500 rounded-xl font-bold text-xs cursor-default border border-white/5">
+                                        تم التسليم
+                                     </button>
+                                 )}
+                              </div>
+                           );
+                        }) : (
+                            <div className="text-center py-20 opacity-50"><p className="text-slate-400">لا توجد واجبات حالياً</p></div>
+                        )}
+                     </div>
+                  </div>
+               )}
+
+               {activeTab === 'quizzes' && (
+                   <div className="space-y-6 pb-24 animate-fadeIn">
+                       <h2 className="text-2xl font-black text-white border-b border-white/10 pb-4 mb-6">الاختبارات</h2>
+                       <div className="grid grid-cols-1 gap-4">
+                           {filteredQuizzes.map(quiz => (
+                               <div key={quiz.id} className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/5 flex justify-between items-center">
+                                   <div>
+                                       <h3 className="font-bold text-white text-lg">{quiz.title}</h3>
+                                       <p className="text-slate-400 text-xs mt-1 font-bold">{quiz.questions?.length || 0} أسئلة</p>
+                                   </div>
+                                   <button onClick={() => handleStartQuiz(quiz)} className="px-6 py-3 bg-amber-500 text-white rounded-xl font-black text-xs shadow-lg hover:bg-amber-600 transition-all">ابدأ ⚡</button>
+                               </div>
+                           ))}
+                       </div>
+                   </div>
+               )}
+
+               {activeTab === 'results' && (
+                  <div className="space-y-6 pb-24 animate-fadeIn">
+                     <h2 className="text-2xl font-black text-white border-b border-white/10 pb-4 mb-6">سجل الدرجات</h2>
+                     {/* ... Results Table ... */}
+                     <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden shadow-2xl backdrop-blur-md">
+                        <table className="w-full text-right text-slate-300">
+                            <thead>
+                                <tr className="bg-white/5 text-xs font-black"><th className="p-4">العنوان</th><th className="p-4">الدرجة</th></tr>
+                            </thead>
+                            <tbody>
+                                {[...results, ...submissions.filter(s=>s.status==='graded')].map((r: any) => (
+                                    <tr key={r.id} className="border-t border-white/5">
+                                        <td className="p-4">{r.quizTitle || assignments.find(a=>a.id===r.assignmentId)?.title}</td>
+                                        <td className="p-4 font-bold text-amber-400">{r.score || r.grade}%</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                     </div>
+                  </div>
+               )}
+            </div>
+         </main>
+
+         <div className="lg:hidden fixed bottom-6 left-6 z-[100] flex flex-col items-start gap-4">
+            {isFabOpen && (
+               <div className="flex flex-col gap-3 mb-2 animate-slideUp">
+                  {sidebarTabs.map((tab) => (
+                     <button
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id); setIsFabOpen(false); }}
+                        className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl transition-all border border-white/10 ${activeTab === tab.id ? 'bg-amber-500 text-white' : 'bg-[#1e293b]/90 text-slate-300'}`}
+                     >
+                        <span className="text-xl">{tab.icon}</span>
+                        <span className="font-bold text-sm whitespace-nowrap">{tab.label}</span>
+                     </button>
+                  ))}
+               </div>
+            )}
+            <button onClick={() => setIsFabOpen(!isFabOpen)} className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-3xl text-white transition-all border-4 border-[#0f172a] ${isFabOpen ? 'bg-rose-500 rotate-90' : 'bg-amber-500'}`}>
+               {isFabOpen ? '✕' : '☰'}
+            </button>
+            {isFabOpen && <div className="fixed inset-0 bg-black/60 z-[-1] backdrop-blur-sm" onClick={() => setIsFabOpen(false)}></div>}
+         </div>
       </div>
+
+      {showLiveStream && isTargetForLive && jitsiEmbedUrl && (
+          <div className="fixed inset-0 z-[3000] bg-black flex flex-col">
+              <div className="bg-[#1D2228] p-4 flex justify-between items-center text-white shrink-0">
+                  <h3 className="font-bold flex items-center gap-2"><span className="text-red-500 animate-pulse">● LIVE</span> {settings.liveSessionTitle}</h3>
+                  <button onClick={() => setShowLiveStream(false)} className="px-4 py-2 bg-red-600 rounded-lg text-xs font-bold hover:bg-red-700">مغادرة ✕</button>
+              </div>
+              <iframe src={jitsiEmbedUrl} className="flex-1 w-full border-0" allowFullScreen />
+          </div>
+      )}
+
+      {activeQuiz && (
+          <div className="fixed inset-0 z-[2000] bg-slate-900 flex flex-col items-center justify-center p-4">
+              <div className="w-full max-w-4xl bg-[#1e293b] rounded-[3rem] p-8 shadow-2xl border border-white/10 flex flex-col max-h-full">
+                  <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/5">
+                      <h3 className="text-xl font-black text-white">{activeQuiz.title}</h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto no-scrollbar space-y-8 pr-2">
+                      {activeQuiz.questions?.map((q, idx) => (
+                          <div key={q.id} className="space-y-4">
+                              <p className="text-white font-bold text-lg"><span className="text-amber-500 ml-2">#{idx+1}</span> {q.question}</p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {q.options?.map((opt, i) => (
+                                      <button key={i} onClick={() => setActiveQuizAnswers(prev => ({...prev, [q.id]: opt}))} className={`p-4 rounded-xl border text-right font-bold transition-all ${activeQuizAnswers[q.id] === opt ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-slate-300'}`}>
+                                          {opt}
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                  <button onClick={submitQuiz} className="mt-6 w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl">إنهاء وتسليم ✅</button>
+              </div>
+          </div>
+      )}
+
+      {showScanner && (
+        <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4">
+            <div className="bg-[#1e293b] w-full max-w-lg rounded-[2rem] p-6 shadow-2xl border border-white/10 relative">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-black text-white">📸 ماسح الواجب</h3>
+                    <button onClick={() => setShowScanner(false)} className="text-slate-400">✕</button>
+                </div>
+                {!scannerImage ? (
+                    <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-600 rounded-2xl h-64 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500">
+                        <span className="text-4xl mb-4">📤</span>
+                        <p className="font-bold text-slate-300">التقاط أو رفع صورة</p>
+                        <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleFileSelect} />
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        <div className="relative rounded-2xl overflow-hidden shadow-lg border border-slate-700 bg-black h-64 flex items-center justify-center">
+                            <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setScannerImage(null)} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold text-sm">إلغاء</button>
+                            <button onClick={submitScannedHomework} className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">تسليم ✓</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
+
+      {showBoard && solvingAsg && (
+        <div className="fixed inset-0 z-[1500] bg-indigo-950 p-2 md:p-6 flex flex-col animate-fadeIn">
+           <div className="flex justify-between items-center mb-4 px-8 text-white">
+              <h3 className="font-black text-xl">حل الواجب: {solvingAsg.title}</h3>
+              <button onClick={() => setShowBoard(false)} className="w-10 h-10 bg-white/10 hover:bg-rose-600 rounded-xl flex items-center justify-center text-lg">✕</button>
+           </div>
+           <div className="flex-1 bg-white rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white/10">
+              <InteractiveBoard 
+                imageUrl={solvingAsg.fileUrl} 
+                onSave={submitBoardHomework} 
+                onCancel={() => setShowBoard(false)} 
+                title={solvingAsg.title} 
+                initialBackground="grid"
+                notation={settings.mathNotation}
+              />
+           </div>
+        </div>
+      )}
+
+      {showLuckyWheel && <LuckyWheel onWin={(p) => { if(onSpinWin) onSpinWin(p); setShowLuckyWheel(false); }} onClose={() => setShowLuckyWheel(false)} />}
+      
+      {selectedVideo && <div className="fixed inset-0 z-[1200] bg-black/95 backdrop-blur-xl flex flex-col p-4 animate-fadeIn"><div className="flex justify-between items-center mb-6 text-white max-w-5xl mx-auto w-full"><div><h3 className="font-bold text-lg md:text-xl text-slate-100">{selectedVideo.title}</h3></div><button onClick={() => setSelectedVideo(null)} className="w-10 h-10 bg-white/10 hover:bg-rose-600 rounded-full flex items-center justify-center text-xl transition-all border border-white/10">✕</button></div><div className="flex-1 flex items-center justify-center w-full"><div className="w-full max-w-5xl"><ProtectedVideo src={selectedVideo.youtubeUrl} title={selectedVideo.title} watermarkText={student.name + ' | ' + student.studentCode} enabled={settings.protectionEnabled} provider={selectedVideo.provider} onProgress={(p) => { if (onVideoProgress && selectedVideo) { onVideoProgress(selectedVideo.id, p); } }} /></div></div></div>}
+
     </div>
   );
 };

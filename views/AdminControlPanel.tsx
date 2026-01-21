@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { 
   Year, Group, Student, AppNotification, QuizResult, 
   PlatformSettings, Assistant, ParentInquiry, CallLog, ScheduleEntry,
-  PlatformReward, RewardRedemption, Quiz, Assignment, AppView
+  PlatformReward, RewardRedemption, Quiz, Assignment, AppView, AssignmentSubmission
 } from '../types';
 
 import Management from './Management';
@@ -17,6 +17,8 @@ import LaunchGuide from './LaunchGuide';
 import Rewards from './Rewards';
 import Schedules from './Schedules';
 import Sections from './Sections';
+import QuizGenerator from './QuizGenerator'; 
+import FilesView from './Files'; 
 
 interface AdminControlPanelProps {
   activeTab: string;
@@ -35,6 +37,7 @@ interface AdminControlPanelProps {
   redemptions: RewardRedemption[];
   quizzes: Quiz[];
   assignments: Assignment[];
+  submissions: AssignmentSubmission[];
   onUpdateSettings: (s: PlatformSettings) => void;
   onAddAssistant: (a: Assistant) => void;
   onDeleteAssistant: (id: string) => void;
@@ -75,7 +78,6 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
   const allowedTabs = useMemo(() => {
     return ALL_TABS.filter(tab => {
         if (permissions.includes(tab.permission)) return true;
-        // استثناءات ذكية للتبويبات التي تحتوي على أقسام متعددة
         if (tab.id === 'comms' && (permissions.includes(AppView.NOTIFICATIONS) || permissions.includes(AppView.LEADERBOARD))) return true;
         if (tab.id === 'groups' && permissions.includes(AppView.SCHEDULE)) return true;
         return false;
@@ -144,7 +146,20 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
           />
         );
       case 'settings':
-        return <Settings settings={props.settings} assistants={props.assistants} onUpdate={props.onUpdateSettings} onAddAssistant={props.onAddAssistant} onDeleteAssistant={props.onDeleteAssistant} />;
+        return (
+          <Settings 
+            settings={props.settings} 
+            assistants={props.assistants} 
+            onUpdate={props.onUpdateSettings} 
+            onAddAssistant={props.onAddAssistant} 
+            onDeleteAssistant={props.onDeleteAssistant}
+            // Passing data for dashboards
+            students={props.students}
+            submissions={props.submissions}
+            inquiries={props.inquiries}
+            notifications={props.notifications}
+          />
+        );
       case 'tech':
         return (
           <div className="space-y-12">
@@ -158,7 +173,6 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
           </div>
         );
       default: 
-        // إذا كان التبويب مفقوداً لسبب ما، اعرض المجموعات كافتراضي
         return <Management years={props.years} groups={props.groups} students={props.students} onAddYear={props.onAddYear} onAddGroup={props.onAddGroup} onDeleteGroup={props.onDeleteGroup} teacherName={props.settings.teacherName} platformName={props.settings.platformName} />;
     }
   };
