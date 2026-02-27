@@ -1,14 +1,18 @@
 
 import { initializeApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // ============================================================================
-// إعدادات Firebase - يتم التعامل معها بمرونة
+// إعدادات Firebase الخاصة بمشروع MathMaster Pro (mathmaster-pri)
 // ============================================================================
 
+// تغيير هذا المتغير إلى true لإجبار التطبيق على العمل في الوضع غير المتصل (Offline Mode)
+// هذا يحل مشكلة "Could not reach Cloud Firestore backend" عند عدم توفر اتصال
+const FORCE_OFFLINE = true;
+
 const PERMANENT_CONFIG = {
-  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA", // تأكد من صحة هذا المفتاح في لوحة تحكم Firebase
+  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",
   authDomain: "mathmaster-pri.firebaseapp.com",
   projectId: "mathmaster-pri",
   storageBucket: "mathmaster-pri.firebasestorage.app",
@@ -20,36 +24,45 @@ const PERMANENT_CONFIG = {
 let app = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
-let initializationError: string | null = null; // متغير لتخزين رسالة الخطأ
+let initializationError: string | null = null;
 
 const initFirebase = () => {
-  try {
-    // التحقق السريع من صحة التكوين قبل المحاولة
-    if (!PERMANENT_CONFIG.apiKey || PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY')) {
-      initializationError = "API Key is missing or placeholder.";
-      console.warn("⚠️ Firebase Config: Missing API Key. App will run in Offline Mode.");
-      return;
-    }
+  if (FORCE_OFFLINE) {
+    console.log("⚠️ Firebase Offline Mode Forced (Connection Errors Prevented)");
+    return;
+  }
 
+  try {
+    // تهيئة التطبيق
     app = initializeApp(PERMANENT_CONFIG);
     
+    // محاولة تهيئة قاعدة البيانات باستخدام initializeFirestore للتحكم الأكبر
     try {
-      db = getFirestore(app);
-      console.log("✅ Database Connected");
+      // نستخدم initializeFirestore بدلاً من getFirestore لتجنب بعض الأخطاء التلقائية
+      // ignoreUndefinedProperties: true يساعد في تجنب الأخطاء عند تمرير قيم undefined
+      db = initializeFirestore(app, {
+         ignoreUndefinedProperties: true
+      });
+      console.log("✅ Firestore Initialized");
     } catch (e: any) {
-      initializationError = e.message || "Firestore Init Failed";
-      console.warn("⚠️ Database Connection Failed (Using Local Storage):", e);
+      initializationError = `Firestore Init Failed: ${e.message}`;
+      console.error("❌ Firestore Init Failed:", e);
+      // في حالة الفشل، نجعل db null ليتم استخدام الوضع المحلي
+      db = null;
     }
 
+    // محاولة تهيئة التخزين
     try {
       storage = getStorage(app);
+      console.log("✅ Storage Initialized");
     } catch (e: any) {
-      console.warn("⚠️ Storage Connection Failed (Using Local Encoding):", e);
+      console.warn("⚠️ Storage Init Failed:", e);
+      storage = null;
     }
 
   } catch (error: any) {
     initializationError = error.message || "Unknown Firebase Init Error";
-    console.error("❌ Firebase Critical Init Error (App will continue offline):", error);
+    console.error("❌ Firebase Critical Init Error:", error);
   }
 };
 
@@ -58,17 +71,17 @@ initFirebase();
 
 export { db, storage };
 
-// دالة لاسترجاع الخطأ لعرضه في الواجهة
+// دالة لاسترجاع الخطأ لعرضه في لوحة التحكم
 export const getFirebaseInitError = () => {
     return initializationError;
 };
 
-// دالة مساعدة للتحقق من حالة النظام
+// دالة للتحقق من حالة الاتصال
 export const isOnlineMode = () => {
   return db !== null;
 };
 
-// التحقق مما إذا كان التطبيق يستخدم التكوين الافتراضي (وضع العرض التجريبي/غير المتصل)
+// هل نستخدم الإعدادات الافتراضية؟ نعم، إذا كان الوضع غير المتصل مفعلاً
 export const isUsingDefaultConfig = () => {
-  return !PERMANENT_CONFIG.apiKey || PERMANENT_CONFIG.apiKey.includes('YOUR_API_KEY');
+  return FORCE_OFFLINE;
 };

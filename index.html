@@ -3,10 +3,16 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="منصة MathMaster Pro التعليمية للأستاذ أشرف جميل. منصة متكاملة لتعليم الرياضيات للمرحلة الثانوية والإعدادية باستخدام الذكاء الاصطناعي." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="منصة MathMaster Pro التعليمية للأستاذ أشرف جميل. منصة متكاملة لتعليم الرياضيات للمرحلة الثانوية والإعدادية." />
     <title>MathMaster PRO | أ. أشرف جميل</title>
     
+    <!-- Performance Optimization: Preconnect to CDNs -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://esm.sh" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#0f172a" />
@@ -15,35 +21,66 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="المحترف" />
     
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4359/4359852.png" />
 
-    <!-- Tldraw CSS -->
-    <link rel="stylesheet" href="https://esm.sh/tldraw@2.4.4/tldraw.css">
+    <!-- Removed Tldraw CSS for Performance -->
 
+    <!-- Critical CSS for Instant Loader -->
     <style>
       html, body {
         overscroll-behavior-y: contain;
+        background-color: #0f172a; /* Match theme color immediately */
+        margin: 0;
+        padding: 0;
+        height: 100%;
       }
-      /* Loading Spinner for Lazy Loading */
-      .app-loader {
+      
+      /* Instant Splash Screen Styles */
+      #root:empty {
+        display: none; /* Hide root until React injects content */
+      }
+      
+      .initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0f172a;
         display: flex;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        background-color: #0f172a;
+        z-index: 99999;
+        font-family: system-ui, -apple-system, sans-serif;
         color: white;
-        font-family: system-ui, sans-serif;
-        flex-direction: column;
-        gap: 20px;
+        transition: opacity 0.5s ease-out;
       }
-      .loader-spinner {
-        width: 48px;
-        height: 48px;
-        border: 5px solid #FFF;
+      
+      .initial-loader.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 5px solid rgba(255, 255, 255, 0.1);
         border-bottom-color: #3b82f6;
         border-radius: 50%;
         animation: rotation 1s linear infinite;
+        margin-bottom: 20px;
       }
+      
+      .brand-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        background: linear-gradient(to right, #fbbf24, #f97316);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-top: 10px;
+      }
+
       @keyframes rotation {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -53,8 +90,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&family=Cairo:wght@300;400;600;700;900&family=El+Messiri:wght@400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -62,12 +97,7 @@
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
     <script>
-      // Polyfill for libraries expecting Node.js environment
-      window.process = {
-        env: {
-          NODE_ENV: 'production'
-        }
-      };
+      window.process = { env: { NODE_ENV: 'production' } };
     </script>
 
     <style>
@@ -78,7 +108,6 @@
         --bg: #f8fafc;
       }
       body { 
-        background-color: #f8fafc; 
         color: #0f172a;
         user-select: none; 
         overflow-x: hidden;
@@ -108,10 +137,6 @@
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       
-      .tl-container {
-        background-color: #f8fafc !important;
-      }
-      
       @media (display-mode: standalone) {
         .glass-nav { padding-top: env(safe-area-inset-top); }
         main { padding-bottom: env(safe-area-inset-bottom); }
@@ -126,20 +151,39 @@
     "react-dom/": "https://esm.sh/react-dom@18.2.0/",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "tldraw": "https://esm.sh/tldraw@2.4.4?deps=react@18.2.0,react-dom@18.2.0",
-    "firebase/app": "https://esm.sh/firebase@10.13.1/app",
-    "firebase/firestore": "https://esm.sh/firebase@10.13.1/firestore?deps=firebase@10.13.1/app",
-    "firebase/storage": "https://esm.sh/firebase@10.13.1/storage?deps=firebase@10.13.1/app",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+    "firebase/app": "https://esm.sh/firebase@10.12.2/app",
+    "firebase/firestore": "https://esm.sh/firebase@10.12.2/firestore?deps=firebase@10.12.2/app",
+    "firebase/storage": "https://esm.sh/firebase@10.12.2/storage?deps=firebase@10.12.2/app",
+    "firebase/": "https://esm.sh/firebase@^12.9.0/"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
   <body class="math-pattern">
+    <!-- Static Loader displayed immediately -->
+    <div id="initial-loader" class="initial-loader">
+      <div class="spinner"></div>
+      <div class="brand-name">MathMaster Pro</div>
+      <div style="margin-top: 10px; color: #64748b; font-size: 0.8rem;">جاري تجهيز المنصة...</div>
+    </div>
+
     <div id="root"></div>
+    
     <script type="module" src="index.tsx"></script>
     <script>
+      // Remove loader when React takes over
+      window.addEventListener('load', () => {
+        // Fallback: if React takes too long or fails, this helps debug
+        setTimeout(() => {
+           const loader = document.getElementById('initial-loader');
+           if (loader && document.getElementById('root').childElementCount > 0) {
+             loader.classList.add('fade-out');
+             setTimeout(() => loader.remove(), 500);
+           }
+        }, 1000);
+      });
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => {
@@ -153,4 +197,3 @@
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
-    

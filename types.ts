@@ -18,19 +18,20 @@ export enum AppView {
   TEST_CENTER = 'TEST_CENTER',
   LAUNCH_GUIDE = 'LAUNCH_GUIDE',
   LEADERBOARD = 'LEADERBOARD',
-  AI_SOLVER = 'AI_SOLVER',
   NOTIFICATIONS = 'NOTIFICATIONS',
   FORMULAS = 'FORMULAS',
   REGISTRATION = 'REGISTRATION',
   REWARDS = 'REWARDS',
   CONTROL_PANEL = 'CONTROL_PANEL',
-  SECTIONS = 'SECTIONS'
+  SECTIONS = 'SECTIONS',
+  BATTLE_ARENA = 'BATTLE_ARENA'
 }
 
 export type PortalTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'slate' | 'violet';
 export type PortalLayout = 'default' | 'compact' | 'stats-focused' | 'modern';
 export type MathNotation = 'arabic' | 'english';
 export type AppFont = 'Cairo' | 'Tajawal' | 'Almarai' | 'El Messiri';
+export type TeacherSpecialization = 'math' | 'physics' | 'chemistry' | 'biology' | 'english' | 'arabic' | 'history' | 'geography' | 'general';
 
 export interface Assistant {
   id: string;
@@ -140,6 +141,8 @@ export interface Quiz {
   type: string; 
   questions?: Question[]; 
   duration?: number; 
+  externalLink?: string;
+  fileUrl?: string;
 }
 
 export interface QuestionAttempt {
@@ -148,7 +151,6 @@ export interface QuestionAttempt {
   userAnswer: string;
   correctAnswer: string;
   isCorrect: boolean;
-  aiExplanation?: string; 
 }
 
 export interface QuizResult { 
@@ -160,7 +162,6 @@ export interface QuizResult {
   status: 'pending' | 'graded'; 
   date: string; 
   handwrittenUrl?: string; 
-  aiFeedback?: string; 
   feedback?: string; 
   isCheatSuspected?: boolean; 
   cheatWarnings?: number; 
@@ -196,13 +197,20 @@ export interface AssignmentSubmission {
   status: 'pending' | 'graded'; 
   feedback?: string;
   audioFeedback?: string; 
-  aiSuggestedGrade?: number;
-  aiAnalysis?: string;
 }
 
 export interface Rating {
   studentId: string;
   value: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  type: 'video' | 'doc';
+  yearId: string;
+  color?: string;
+  createdAt: string;
 }
 
 export interface EducationalSource {
@@ -214,10 +222,10 @@ export interface EducationalSource {
   yearId: string;
   ratings?: Rating[];
   nextSourceId?: string;
-  isAiReference?: boolean;
   textContent?: string;
-  term?: '1' | '2'; // Added: First Term or Second Term
-  subject?: string; // Added: Algebra, Geometry, etc.
+  term?: '1' | '2'; 
+  subject?: string; 
+  folderId?: string;
 }
 
 export interface ScheduleEntry {
@@ -248,7 +256,6 @@ export interface ChatMessage {
   recipientId?: string;
   yearId?: string;
   audioData?: string;
-  drawingData?: string; // New: For programmatic geometry
 }
 
 export interface VideoLesson {
@@ -259,8 +266,9 @@ export interface VideoLesson {
   yearId: string;
   uploadDate: string;
   thumbnailUrl?: string;
-  term?: '1' | '2'; // Added: First Term or Second Term
-  subject?: string; // Added: Algebra, Geometry, etc.
+  term?: '1' | '2'; 
+  subject?: string; 
+  folderId?: string;
 }
 
 export interface VideoNote {
@@ -310,7 +318,6 @@ export interface AppNotification {
   isRead: boolean;
 }
 
-// New Branding Interfaces
 export interface BrandingSettings {
   primaryColor: string;
   secondaryColor: string;
@@ -336,7 +343,6 @@ export interface DashboardWidgets {
   showTools: boolean;
 }
 
-// New Interface for Tab Management
 export interface TabFeature {
   id: string;
   label: string;
@@ -350,6 +356,9 @@ export interface FeatureConfig {
 export interface PlatformSettings {
   teacherName: string;
   platformName: string;
+  teacherSpecialization: TeacherSpecialization; // New
+  branches: string[]; // New: Dynamic subjects (e.g. ['Algebra', 'Geometry'] or ['Grammar', 'Reading'])
+  
   adminCode: string; 
   studentWelcomeMsg: string;
   parentWelcomeMsg: string;  
@@ -361,23 +370,25 @@ export interface PlatformSettings {
   liveSessionActive: boolean;
   liveSessionLink: string;
   liveSessionTitle: string;
-  liveSessionTargetYear?: string; // New: Target audience
+  liveSessionTargetYear?: string;
   allowSelfRegistration: boolean;
   mathNotation: MathNotation;
   autoAttendanceEnabled: boolean;
   autoParentReportEnabled: boolean;
   enableChat: boolean;
   enableLeaderboard: boolean;
-  enableAiSolver: boolean;
   examMode: boolean;
   integrityMode: boolean;
   maxDevicesPerStudent: number;
+  
+  subscriptionEnabled: boolean;
+  paymentInstructions?: string;
+
   viewLabels?: Record<string, string>;
   viewIcons?: Record<string, string>;
   enabledViews?: string[];
   customSections?: CustomSection[];
   
-  // New Settings Objects
   branding: BrandingSettings;
   contentTexts: ContentTextSettings;
   dashboardWidgets?: DashboardWidgets; 

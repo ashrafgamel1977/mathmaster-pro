@@ -1,40 +1,37 @@
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AppView, PlatformSettings, Student, Year, Group, Quiz, Assignment, 
   AssignmentSubmission, QuizResult, VideoLesson, EducationalSource, 
   ChatMessage, AppNotification, Assistant, ParentInquiry, CallLog, 
-  ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, VideoView, VideoNote, CustomSection
+  ScheduleEntry, MathFormula, PlatformReward, RewardRedemption, VideoView, VideoNote, CustomSection, Folder
 } from './types';
 
-// Lazy Load Views for Performance
-const LandingPage = lazy(() => import('./views/LandingPage'));
-const Dashboard = lazy(() => import('./views/Dashboard'));
-const StudentPortal = lazy(() => import('./views/StudentPortal'));
-const ParentPortal = lazy(() => import('./views/ParentPortal'));
-const StudentList = lazy(() => import('./components/StudentList'));
-const AssignmentsView = lazy(() => import('./views/Assignments'));
-const QuizGenerator = lazy(() => import('./views/QuizGenerator'));
-const LiveClass = lazy(() => import('./views/LiveClass'));
-const FilesView = lazy(() => import('./views/Files'));
-const Management = lazy(() => import('./views/Management'));
-const QuizResults = lazy(() => import('./views/QuizResults'));
-const Settings = lazy(() => import('./views/Settings'));
-const ChatRoom = lazy(() => import('./views/ChatRoom'));
-const CallCenter = lazy(() => import('./views/CallCenter'));
-const TestCenter = lazy(() => import('./views/TestCenter'));
-const LaunchGuide = lazy(() => import('./views/LaunchGuide'));
-const Leaderboard = lazy(() => import('./views/Leaderboard'));
-const AISolver = lazy(() => import('./views/AISolver'));
-const Notifications = lazy(() => import('./views/Notifications'));
-const Formulas = lazy(() => import('./views/Formulas'));
-const Registration = lazy(() => import('./views/Registration'));
-const Rewards = lazy(() => import('./views/Rewards'));
-const AdminControlPanel = lazy(() => import('./views/AdminControlPanel'));
-const Schedules = lazy(() => import('./views/Schedules'));
-const Sections = lazy(() => import('./views/Sections'));
+// Views
+import LandingPage from './views/LandingPage';
+import Dashboard from './views/Dashboard';
+import StudentPortal from './views/StudentPortal';
+import ParentPortal from './views/ParentPortal';
+import StudentList from './components/StudentList';
+import AssignmentsView from './views/Assignments';
+import QuizGenerator from './views/QuizGenerator';
+import LiveClass from './views/LiveClass';
+import FilesView from './views/Files';
+import Management from './views/Management';
+import QuizResults from './views/QuizResults';
+import Settings from './views/Settings';
+import ChatRoom from './views/ChatRoom';
+import TestCenter from './views/TestCenter';
+import LaunchGuide from './views/LaunchGuide';
+import Leaderboard from './views/Leaderboard';
+import Notifications from './views/Notifications';
+import Formulas from './views/Formulas';
+import Registration from './views/Registration';
+import AdminControlPanel from './views/AdminControlPanel';
+import Schedules from './views/Schedules';
+import Sections from './views/Sections';
 
-// Components (Keep Sidebar/BottomNav eager if small, or lazy if needed)
+// Components
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import { ToastContainer, ToastProps } from './components/Toast';
@@ -47,6 +44,8 @@ import { isUsingDefaultConfig } from './firebaseConfig';
 const INITIAL_SETTINGS: PlatformSettings = {
   teacherName: 'أشرف جميل',
   platformName: 'MathMaster Pro',
+  teacherSpecialization: 'math',
+  branches: ['عام'],
   adminCode: '1234',
   studentWelcomeMsg: 'أهلاً بك في منصة التفوق',
   parentWelcomeMsg: 'تابع مستوى ابنك لحظة بلحظة',
@@ -64,10 +63,13 @@ const INITIAL_SETTINGS: PlatformSettings = {
   autoParentReportEnabled: false,
   enableChat: true,
   enableLeaderboard: true,
-  enableAiSolver: true,
   examMode: false,
   integrityMode: false,
   maxDevicesPerStudent: 2,
+  
+  subscriptionEnabled: false, // Default is OFF (Free)
+  paymentInstructions: 'للاشتراك يرجى تحويل المبلغ عبر فودافون كاش على الرقم: 01000000000 ثم إرسال صورة التحويل هنا.',
+
   branding: {
     primaryColor: '#2563eb',
     secondaryColor: '#f59e0b',
@@ -89,7 +91,7 @@ const INITIAL_SETTINGS: PlatformSettings = {
     showLeaderboard: true,
     showTools: true
   },
-  enabledViews: Object.values(AppView),
+  enabledViews: Object.values(AppView), // Default to ALL views enabled
   featureConfig: {
     [AppView.STUDENT_PORTAL]: [
       { id: 'dashboard', label: 'الرئيسية', enabled: true },
@@ -99,7 +101,6 @@ const INITIAL_SETTINGS: PlatformSettings = {
       { id: 'results', label: 'التقارير', enabled: true }
     ],
     [AppView.QUIZZES]: [
-      { id: 'ai', label: 'مولد الأسئلة (AI)', enabled: true },
       { id: 'scanner', label: 'ماسح الورق', enabled: true },
       { id: 'editor', label: 'المحرر اليدوي', enabled: true },
       { id: 'external', label: 'روابط خارجية', enabled: true }
@@ -108,10 +109,6 @@ const INITIAL_SETTINGS: PlatformSettings = {
       { id: 'videos', label: 'فيديوهات', enabled: true },
       { id: 'docs', label: 'كتب وملازم', enabled: true }
     ],
-    [AppView.CALL_CENTER]: [
-      { id: 'inquiries', label: 'الطلبات الواردة', enabled: true },
-      { id: 'logs', label: 'سجل المكالمات', enabled: true }
-    ],
     [AppView.CHAT]: [
       { id: 'group', label: 'الساحة العامة', enabled: true },
       { id: 'private', label: 'مراسلة المعلم', enabled: true }
@@ -119,17 +116,15 @@ const INITIAL_SETTINGS: PlatformSettings = {
   }
 };
 
-const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-full min-h-[50vh]">
-    <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-  </div>
-);
-
 const App: React.FC = () => {
+  // --- State Management ---
   const [currentView, setCurrentView] = useState<AppView | string>(AppView.DASHBOARD);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null); // { role, id, name, ... }
   const [settings, setSettings] = useState<PlatformSettings>(INITIAL_SETTINGS);
   
+  // Admin Panel State
+  const [adminPanelTab, setAdminPanelTab] = useState('groups');
+
   // Data Collections
   const [students, setStudents] = useState<Student[]>([]);
   const [years, setYears] = useState<Year[]>([]);
@@ -143,26 +138,36 @@ const App: React.FC = () => {
   const [educationalSources, setEducationalSources] = useState<EducationalSource[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
-  const [inquiries, setInquiries] = useState<ParentInquiry[]>([]);
-  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [formulas, setFormulas] = useState<MathFormula[]>([]);
-  const [rewards, setRewards] = useState<PlatformReward[]>([]);
-  const [redemptions, setRedemptions] = useState<RewardRedemption[]>([]);
   const [videoViews, setVideoViews] = useState<VideoView[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
 
   const [toasts, setToasts] = useState<Omit<ToastProps, 'onClose'>[]>([]);
   const [isDemoMode, setIsDemoMode] = useState(isUsingDefaultConfig());
 
+  // --- Helper for Safe Storage ---
   const safeSetItem = (key: string, value: any) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.warn(`Failed to save ${key} to localStorage`, e);
+      console.warn(`Failed to save ${key} to localStorage (Circular structure or quota exceeded)`, e);
     }
   };
 
+  // --- Helper for Device Fingerprinting ---
+  const getDeviceId = () => {
+    let id = localStorage.getItem('mm_device_id');
+    if (!id) {
+      id = 'dev_' + Date.now() + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('mm_device_id', id);
+    }
+    return id;
+  };
+
+  // --- Effects ---
   useEffect(() => {
+    // Load local settings/user if available
     try {
       const savedUser = localStorage.getItem('math_user');
       if (savedUser) setCurrentUser(JSON.parse(savedUser));
@@ -173,7 +178,9 @@ const App: React.FC = () => {
       console.error("Error loading local storage data", e);
     }
 
+    // Data Loading (Firebase or LocalStorage for Demo)
     if (!isDemoMode) {
+      // Subscribe to Firebase collections
       const unsubs = [
         subscribeToCollection('students', setStudents),
         subscribeToCollection('years', setYears),
@@ -187,12 +194,9 @@ const App: React.FC = () => {
         subscribeToCollection('educationalSources', setEducationalSources),
         subscribeToCollection('messages', setMessages),
         subscribeToCollection('assistants', setAssistants),
-        subscribeToCollection('inquiries', setInquiries),
-        subscribeToCollection('callLogs', setCallLogs),
         subscribeToCollection('schedules', setSchedules),
         subscribeToCollection('formulas', setFormulas),
-        subscribeToCollection('rewards', setRewards),
-        subscribeToCollection('redemptions', setRedemptions),
+        subscribeToCollection('folders', setFolders),
         subscribeToCollection('settings', (data) => { 
           if(data[0]) {
              setSettings(prev => ({
@@ -209,6 +213,7 @@ const App: React.FC = () => {
       ];
       return () => unsubs.forEach(unsub => unsub());
     } else {
+      // Initialize Mock Data
       if (students.length === 0) {
         const mockStudent: Student = {
           id: 's_demo_1',
@@ -239,11 +244,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isDemoMode) {
       safeSetItem('math_settings', settings);
-    } else if (currentUser?.role === 'teacher') {
-      saveData('settings', { ...settings, id: 'global_settings' });
     }
-  }, [settings, isDemoMode, currentUser]);
+    // In non-demo mode, settings are saved explicitly by UI handlers via persistData -> saveData.
+    // We do NOT want to auto-save here as it causes a loop with the subscription.
+  }, [settings, isDemoMode]);
 
+  // --- Handlers ---
   const addToast = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -279,12 +285,43 @@ const App: React.FC = () => {
         setCurrentUser(guestUser);
         return;
       }
+      
       const student = students.find(s => s.studentCode === cleanCode);
       if (student) {
-        const studentUser = { ...student, role: 'student' };
-        setCurrentUser(studentUser);
-        safeSetItem('math_user', studentUser);
-        addToast('تم تسجيل الدخول بنجاح', 'success');
+        if (student.status === 'pending') {
+            addToast('حسابك قيد المراجعة من قبل الإدارة', 'info');
+            return;
+        }
+
+        // --- Device Lock Logic ---
+        const currentDeviceId = getDeviceId();
+        const existingDevices = student.deviceIds || [];
+        const maxDevices = settings.maxDevicesPerStudent || 2;
+
+        let isAllowed = false;
+        let updatedDeviceIds = existingDevices;
+
+        // 1. Check if device is already registered
+        if (existingDevices.includes(currentDeviceId)) {
+            isAllowed = true;
+        } 
+        // 2. If not registered, check if we have space
+        else if (existingDevices.length < maxDevices) {
+            updatedDeviceIds = [...existingDevices, currentDeviceId];
+            // Save new device list
+            persistData('students', { id: student.id, deviceIds: updatedDeviceIds }, 'update');
+            isAllowed = true;
+        }
+
+        if (isAllowed) {
+            const studentUser = { ...student, role: 'student', deviceIds: updatedDeviceIds };
+            setCurrentUser(studentUser);
+            safeSetItem('math_user', studentUser);
+            addToast('تم تسجيل الدخول بنجاح', 'success');
+        } else {
+            addToast(`⛔ تم تجاوز الحد المسموح للأجهزة (${existingDevices.length}/${maxDevices}). يرجى التواصل مع الإدارة لتصفير الأجهزة.`, 'error');
+        }
+
       } else {
         addToast(`كود الطالب "${cleanCode}" غير موجود`, 'error');
       }
@@ -365,32 +402,34 @@ const App: React.FC = () => {
   const fontStyle = { fontFamily: settings.branding.fontFamily || 'Cairo' };
 
   if (!currentUser) {
+    if (currentView === AppView.REGISTRATION) {
+      return (
+        <div style={fontStyle}>
+          <Registration 
+            years={years} 
+            groups={groups} 
+            onRegister={(data) => {
+              const newStudent = { ...data, id: 's' + Date.now(), points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [] };
+              persistData('students', newStudent, 'save');
+              addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
+              handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
+            }}
+            onBack={() => setCurrentView(AppView.DASHBOARD)}
+            teacherName={settings.teacherName}
+          />
+          <InstallPWA />
+        </div>
+      );
+    }
     return (
       <div style={fontStyle}>
-        <Suspense fallback={<LoadingSpinner />}>
-          {currentView === AppView.REGISTRATION ? (
-            <Registration 
-              years={years} 
-              groups={groups} 
-              onRegister={(data) => {
-                const newStudent = { ...data, id: 's' + Date.now(), points: 0, score: 0, scoreHistory: [], badges: [], streaks: 0, deviceIds: [] };
-                persistData('students', newStudent, 'save');
-                addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
-                handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
-              }}
-              onBack={() => setCurrentView(AppView.DASHBOARD)}
-              teacherName={settings.teacherName}
-            />
-          ) : (
-            <LandingPage 
-              teacherName={settings.teacherName} 
-              platformName={settings.platformName}
-              settings={settings}
-              onUnifiedLogin={handleUnifiedLogin} 
-              onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} 
-            />
-          )}
-        </Suspense>
+        <LandingPage 
+          teacherName={settings.teacherName} 
+          platformName={settings.platformName}
+          settings={settings}
+          onUnifiedLogin={handleUnifiedLogin} 
+          onStudentRegister={() => setCurrentView(AppView.REGISTRATION)} 
+        />
         <InstallPWA />
       </div>
     );
@@ -399,80 +438,53 @@ const App: React.FC = () => {
   if (currentUser.role === 'student') {
     return (
       <div style={fontStyle}>
-        <Suspense fallback={<LoadingSpinner />}>
-          <StudentPortal 
-            student={currentUser}
-            assignments={assignments}
-            submissions={submissions}
-            quizzes={quizzes}
-            results={results}
-            settings={settings}
-            videoLessons={videoLessons}
-            notifications={notifications}
-            groups={groups}
-            educationalSources={educationalSources}
-            schedules={schedules}
-            formulas={formulas}
-            rewards={rewards}
-            redemptions={redemptions}
-            messages={messages}
-            years={years}
-            students={students}
-            onQuizSubmit={(res) => persistData('results', res, 'save')}
-            onAssignmentSubmit={(sub) => persistData('submissions', { ...sub, id: 'sub' + Date.now(), status: 'pending' }, 'save')}
-            onLogin={() => {}} 
-            onSendMessage={(text, type, recipientId, audioData) => {
-              const msg = { 
-                id: 'msg' + Date.now(), 
-                text, type, recipientId, audioData, 
-                senderId: currentUser.id, 
-                senderName: currentUser.name, 
-                senderRole: 'student', 
-                timestamp: new Date().toLocaleTimeString('ar-EG'),
-                yearId: currentUser.yearId 
-              };
-              persistData('messages', msg, 'save');
-            }}
-            onMarkNotificationRead={(id) => { }}
-            onRedeemReward={(rId) => {
-              const reward = rewards.find(r => r.id === rId);
-              if (reward && currentUser.points >= reward.cost) {
-                persistData('redemptions', { 
-                  id: 'red' + Date.now(), 
-                  studentId: currentUser.id, 
-                  studentName: currentUser.name, 
-                  rewardId: reward.id, 
-                  rewardTitle: reward.title, 
-                  status: 'pending', 
-                  timestamp: new Date().toLocaleDateString('ar-EG') 
-                }, 'save');
-                const newPoints = currentUser.points - reward.cost;
-                persistData('students', { id: currentUser.id, points: newPoints }, 'update');
-                setCurrentUser({ ...currentUser, points: newPoints });
-                addToast('تم طلب الجائزة بنجاح', 'success');
-              }
-            }}
-            onSpinWin={(points) => {
-              const newPoints = (currentUser.points || 0) + points;
-              persistData('students', { id: currentUser.id, points: newPoints, lastSpinDate: new Date().toISOString() }, 'update');
-              setCurrentUser({ ...currentUser, points: newPoints, lastSpinDate: new Date().toISOString() });
-              addToast(`مبروك! ربحت ${points} نقطة`, 'success');
-            }}
-            onUpdateStudent={(updates) => {
-              persistData('students', { id: currentUser.id, ...updates }, 'update');
-              setCurrentUser({ ...currentUser, ...updates });
-            }}
-            onRateSource={(srcId, rating) => {
-              const source = educationalSources.find(s => s.id === srcId);
-              if(source) {
-                const newRatings = [...(source.ratings || []).filter(r => r.studentId !== currentUser.id), { studentId: currentUser.id, value: rating }];
-                persistData('educationalSources', { id: srcId, ratings: newRatings }, 'update');
-              }
-            }}
-            onVideoProgress={handleVideoProgress}
-            onBack={handleLogout}
-          />
-        </Suspense>
+        <StudentPortal 
+          student={currentUser}
+          assignments={assignments}
+          submissions={submissions}
+          quizzes={quizzes}
+          results={results}
+          settings={settings}
+          videoLessons={videoLessons}
+          notifications={notifications}
+          groups={groups}
+          educationalSources={educationalSources}
+          schedules={schedules}
+          formulas={formulas}
+          messages={messages}
+          years={years}
+          students={students}
+          onQuizSubmit={(res) => persistData('results', res, 'save')}
+          onAssignmentSubmit={(sub) => persistData('submissions', { ...sub, id: 'sub' + Date.now(), status: 'pending' }, 'save')}
+          onLogin={() => {}} 
+          onSendMessage={(text, type, recipientId, audioData) => {
+            const msg = { 
+              id: 'msg' + Date.now(), 
+              text, type, recipientId, audioData, 
+              senderId: currentUser.id, 
+              senderName: currentUser.name, 
+              senderRole: 'student', 
+              timestamp: new Date().toLocaleTimeString('ar-EG'),
+              yearId: currentUser.yearId 
+            };
+            persistData('messages', msg, 'save');
+          }}
+          onMarkNotificationRead={(id) => { }}
+          onUpdateStudent={(updates) => {
+            persistData('students', { id: currentUser.id, ...updates }, 'update');
+            setCurrentUser({ ...currentUser, ...updates });
+          }}
+          onRateSource={(srcId, rating) => {
+            const source = educationalSources.find(s => s.id === srcId);
+            if(source) {
+              const newRatings = [...(source.ratings || []).filter(r => r.studentId !== currentUser.id), { studentId: currentUser.id, value: rating }];
+              persistData('educationalSources', { id: srcId, ratings: newRatings }, 'update');
+            }
+          }}
+          onVideoProgress={handleVideoProgress}
+          onBack={handleLogout}
+          addToast={addToast}
+        />
         <InstallPWA />
       </div>
     );
@@ -481,16 +493,14 @@ const App: React.FC = () => {
   if (currentUser.role === 'parent') {
     return (
       <div style={fontStyle}>
-        <Suspense fallback={<LoadingSpinner />}>
-          <ParentPortal 
-            student={currentUser} 
-            results={results} 
-            onLogin={() => {}} 
-            settings={settings}
-            onSendInquiry={(inq) => { persistData('inquiries', inq, 'save'); addToast('تم إرسال الطلب', 'success'); }}
-            onBack={handleLogout}
-          />
-        </Suspense>
+        <ParentPortal 
+          student={currentUser} 
+          results={results} 
+          onLogin={() => {}} 
+          settings={settings}
+          onSendInquiry={(inq) => { addToast('تم إرسال الطلب', 'success'); }}
+          onBack={handleLogout}
+        />
         <InstallPWA />
       </div>
     );
@@ -531,7 +541,8 @@ const App: React.FC = () => {
            status: 'active',
            badges: [],
            streaks: 10,
-           deviceIds: []
+           deviceIds: [],
+           isPaid: true
         };
         return (
           <StudentPortal 
@@ -547,8 +558,6 @@ const App: React.FC = () => {
             educationalSources={educationalSources}
             schedules={schedules}
             formulas={formulas}
-            rewards={rewards}
-            redemptions={[]}
             messages={[]}
             years={years}
             students={students}
@@ -557,18 +566,17 @@ const App: React.FC = () => {
             onLogin={()=>{}}
             onSendMessage={()=>{}}
             onMarkNotificationRead={()=>{}}
-            onRedeemReward={()=>{}}
-            onSpinWin={()=>{}}
             onUpdateStudent={()=>{}}
             onRateSource={()=>{}}
             onBack={() => setCurrentView(AppView.DASHBOARD)}
+            addToast={addToast}
           />
         );
       case AppView.STUDENTS:
         return (
           <StudentList 
             students={students} groups={groups} years={years} notifications={notifications}
-            submissions={submissions} results={results} 
+            submissions={submissions} results={results} // Pass these props
             teacherName={currentUser.name}
             onAttendanceChange={(id) => {
               const s = students.find(x => x.id === id);
@@ -603,7 +611,16 @@ const App: React.FC = () => {
             quizzes={quizzes}
             onDelete={(id) => persistData('quizzes', id, 'delete')}
             onPublish={(title, yearId, qs, type, link, file) => {
-              const newQuiz: Quiz = { id: 'qz'+Date.now(), title, yearId, date: new Date().toLocaleDateString('ar-EG'), type, questions: qs || [] };
+              const newQuiz: Quiz = { 
+                id: 'qz'+Date.now(), 
+                title, 
+                yearId, 
+                date: new Date().toLocaleDateString('ar-EG'), 
+                type, 
+                questions: qs || [],
+                externalLink: link,
+                fileUrl: file
+              };
               persistData('quizzes', newQuiz, 'save');
               addToast('تم نشر الاختبار', 'success');
             }}
@@ -622,11 +639,13 @@ const App: React.FC = () => {
       case AppView.FILES:
         return (
           <FilesView 
-            years={years} videoLessons={videoLessons} educationalSources={educationalSources} students={students} videoViews={videoViews}
+            years={years} videoLessons={videoLessons} educationalSources={educationalSources} students={students} videoViews={videoViews} folders={folders}
             onAddVideo={(v) => { persistData('videoLessons', { ...v, id: 'vid'+Date.now() }, 'save'); addToast('تمت الإضافة', 'success'); }}
             onDeleteVideo={(id) => persistData('videoLessons', id, 'delete')}
             onAddSource={(s) => { persistData('educationalSources', s, 'save'); addToast('تمت الإضافة', 'success'); }}
             onDeleteSource={(id) => persistData('educationalSources', id, 'delete')}
+            onAddFolder={(f) => { persistData('folders', { ...f, id: 'fld'+Date.now() }, 'save'); addToast('تم إنشاء المجلد', 'success'); }}
+            onDeleteFolder={(id) => persistData('folders', id, 'delete')}
             settings={settings}
           />
         );
@@ -652,7 +671,7 @@ const App: React.FC = () => {
         return (
           <ChatRoom 
             user={currentUser} messages={messages} years={years} students={students} notation={settings.mathNotation}
-            educationalSources={educationalSources} settings={settings}
+            educationalSources={educationalSources} 
             onSendMessage={(text, type, recId, audio) => {
               persistData('messages', { 
                 id: 'm'+Date.now(), text, type, recipientId: recId, audioData: audio, 
@@ -665,18 +684,10 @@ const App: React.FC = () => {
         return (
           <Settings 
             settings={settings} assistants={assistants}
-            students={students} submissions={submissions} inquiries={inquiries} notifications={notifications}
+            students={students} submissions={submissions} notifications={notifications}
             onUpdate={(s) => { setSettings(s); persistData('settings', s, 'update'); addToast('تم الحفظ', 'success'); }}
             onAddAssistant={(a) => { persistData('assistants', a, 'save'); addToast('تمت الإضافة', 'success'); }}
             onDeleteAssistant={(id) => persistData('assistants', id, 'delete')}
-          />
-        );
-      case AppView.CALL_CENTER:
-        return (
-          <CallCenter 
-            inquiries={inquiries} callLogs={callLogs} students={students} teacherName={currentUser.name} settings={settings}
-            onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
-            onAddCallLog={(l) => { persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save'); addToast('تم الحفظ', 'success'); }}
           />
         );
       case AppView.NOTIFICATIONS:
@@ -688,18 +699,6 @@ const App: React.FC = () => {
             onDelete={(id) => persistData('notifications', id, 'delete')}
           />
         );
-      case AppView.REWARDS:
-        return (
-          <Rewards 
-            rewards={rewards} redemptions={redemptions} role="teacher"
-            onAddReward={(r) => { persistData('rewards', { ...r, id: 'rw'+Date.now() }, 'save'); }}
-            onDeleteReward={(id) => persistData('rewards', id, 'delete')}
-            onRedeem={() => {}}
-            onMarkDelivered={(id) => { persistData('redemptions', { id, status: 'delivered' }, 'update'); addToast('تم التسليم', 'success'); }}
-          />
-        );
-      case AppView.AI_SOLVER:
-        return <AISolver notation={settings.mathNotation} />;
       case AppView.LEADERBOARD:
         return <Leaderboard students={students} years={years} />;
       case AppView.SCHEDULE:
@@ -731,10 +730,10 @@ const App: React.FC = () => {
       case AppView.CONTROL_PANEL:
         return (
           <AdminControlPanel 
-            activeTab="groups"
-            onTabChange={() => {}}
+            activeTab={adminPanelTab}
+            onTabChange={setAdminPanelTab}
             years={years} groups={groups} students={students} notifications={notifications} results={results} settings={settings}
-            assistants={assistants} inquiries={inquiries} callLogs={callLogs} schedules={schedules} rewards={rewards} redemptions={redemptions}
+            assistants={assistants} schedules={schedules}
             quizzes={quizzes} assignments={assignments} submissions={submissions}
             onUpdateSettings={(s) => { setSettings(s); persistData('settings', s, 'update'); }}
             onAddAssistant={(a) => persistData('assistants', a, 'save')}
@@ -742,15 +741,10 @@ const App: React.FC = () => {
             onAddYear={(n) => persistData('years', { id: 'y'+Date.now(), name: n }, 'save')}
             onAddGroup={(n, y, t, ty, g, c, p) => persistData('groups', { id: 'g'+Date.now(), name: n, yearId: y, time: t, type: ty, gender: g, capacity: c, codePrefix: p, joinCode: p+(Math.floor(Math.random()*1000)) }, 'save')}
             onDeleteGroup={(id) => persistData('groups', id, 'delete')}
-            onUpdateInquiry={(id, s) => persistData('inquiries', { id, status: s }, 'update')}
-            onAddCallLog={(l) => persistData('callLogs', { ...l, id: 'cl'+Date.now() }, 'save')}
             onSendNotif={(n) => persistData('notifications', { ...n, id: 'n'+Date.now() }, 'save')}
             onDeleteNotif={(id) => persistData('notifications', id, 'delete')}
             onMarkNotifRead={() => {}}
             onUpdateResult={(id, s, f) => persistData('results', { id, score: s, feedback: f, status: 'graded' }, 'update')}
-            onAddReward={(r) => persistData('rewards', { ...r, id: 'rw'+Date.now() }, 'save')}
-            onDeleteReward={(id) => persistData('rewards', id, 'delete')}
-            onMarkRewardDelivered={(id) => persistData('redemptions', { id, status: 'delivered' }, 'update')}
             onAddSchedule={(s) => persistData('schedules', { ...s, id: 'sch'+Date.now() }, 'save')}
             onDeleteSchedule={(id) => persistData('schedules', id, 'delete')}
             onMockData={() => {}}
@@ -771,6 +765,7 @@ const App: React.FC = () => {
           />
         );
       
+      // Render custom sections
       default:
         const customSec = settings.customSections?.find(s => s.id === currentView);
         if (customSec) {
@@ -799,6 +794,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex" style={fontStyle}>
+      {/* Teacher Sidebar */}
       <Sidebar 
         currentView={currentView} 
         setView={setCurrentView} 
@@ -808,17 +804,17 @@ const App: React.FC = () => {
         pendingCount={submissions.filter(s => s.status === 'pending').length}
         unreadChatCount={messages.filter(m => m.senderRole === 'student' && !m.readBy?.includes('teacher')).length}
         isConnected={!isDemoMode}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen no-scrollbar relative pb-32">
-        <Suspense fallback={<LoadingSpinner />}>
-          {renderTeacherContent()}
-        </Suspense>
+        {renderTeacherContent()}
         <BottomNav 
           currentView={currentView} 
           setView={setCurrentView} 
           settings={settings} 
           loggedUser={currentUser} 
+          onLogout={handleLogout}
         />
       </main>
 
@@ -829,4 +825,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-    

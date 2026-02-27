@@ -1,9 +1,9 @@
 
-const CACHE_NAME = 'mathmaster-pro-v7';
+const CACHE_NAME = 'mathmaster-pro-v8';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  './',
+  './index.html',
+  './manifest.json',
   'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap',
   'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css',
   'https://cdn.tailwindcss.com',
@@ -31,12 +31,21 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation requests (HTML pages) - Try Network first, fall back to Cache
+  // Navigation requests (HTML pages)
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
-      })
+      fetch(event.request)
+        .then((response) => {
+          // If server returns 404, try to serve index from cache (SPA fallback)
+          if (!response || response.status === 404) {
+             return caches.match('./index.html') || caches.match('./');
+          }
+          return response;
+        })
+        .catch(() => {
+          // Offline fallback
+          return caches.match('./index.html') || caches.match('./');
+        })
     );
     return;
   }
@@ -45,12 +54,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then(response => {
-        // Cache external assets dynamically if successful (optional, risky for huge files)
-        // For now, simple return
-        return response;
-      });
+      return fetch(event.request);
     })
   );
 });
-    
