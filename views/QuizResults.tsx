@@ -1,8 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { QuizResult, Student, AppNotification } from '../types';
-import { analyzeStudentWork, generateParentReport } from '../services/geminiService';
-import InteractiveBoard from '../components/InteractiveBoard';
 
 interface QuizResultsProps {
   results: QuizResult[];
@@ -17,21 +15,6 @@ const QuizResults: React.FC<QuizResultsProps> = ({ results, students, notificati
   const [activeTab, setActiveTab] = useState<'list' | 'analytics'>('list');
   const [gradingResult, setGradingResult] = useState<QuizResult | null>(null);
   const [manualScore, setManualScore] = useState<string>('');
-  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
-
-  const handleAiGrade = async () => {
-    if (!gradingResult?.handwrittenUrl) return;
-    setIsAiAnalyzing(true);
-    try {
-      const analysis = await analyzeStudentWork({ data: gradingResult.handwrittenUrl, mimeType: 'image/jpeg' }, notation);
-      setManualScore(analysis.suggestedGrade.toString());
-      alert(`اقترح المساعد الذكي درجة ${analysis.suggestedGrade} مع تعليق: ${analysis.feedback}`);
-    } catch (e) {
-      alert("عذراً، لم أستطع قراءة الصورة بوضوح.");
-    } finally {
-      setIsAiAnalyzing(false);
-    }
-  };
 
   const handleSendQuickReport = async (studentName: string, parentPhone: string, quizTitle: string, score: number) => {
     const message = `أهلاً بحضرتك ولي أمر الطالب ${studentName}،\nيسرنا إبلاغك بنتيجة اختبار "${quizTitle}" حيث حصل على ${score}%.\n${score >= 90 ? 'مستوى ممتاز، نشكركم على الاهتمام.' : score >= 70 ? 'مستوى جيد، يرجى الاستمرار.' : 'نرجو المزيد من المتابعة لرفع المستوى.'}\n\nأ. أشرف جميل`;
@@ -250,15 +233,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ results, students, notificati
               <div className="p-10 bg-blue-600 text-white flex flex-col gap-4">
                  <button onClick={() => setGradingResult(null)} className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">✕</button>
                  <h3 className="text-2xl font-black">رصد الدرجة</h3>
-                 {gradingResult.handwrittenUrl && (
-                   <button 
-                     onClick={handleAiGrade}
-                     disabled={isAiAnalyzing}
-                     className="py-3 bg-amber-400 text-indigo-950 rounded-xl font-black text-xs shadow-lg hover:scale-105 transition-all"
-                   >
-                     {isAiAnalyzing ? 'جاري التحليل الذكي...' : '🪄 تصحيح آلي بالذكاء الاصطناعي'}
-                   </button>
-                 )}
+
               </div>
 
               <div className="p-10 flex-1 space-y-6">
@@ -278,8 +253,8 @@ const QuizResults: React.FC<QuizResultsProps> = ({ results, students, notificati
 
            <div className="flex-1 bg-slate-100 relative p-4 lg:p-14 flex items-center justify-center">
               {gradingResult.handwrittenUrl ? (
-                <div className="w-full h-full bg-white rounded-[4rem] overflow-hidden shadow-2xl border-8 border-white">
-                  <InteractiveBoard imageUrl={gradingResult.handwrittenUrl} onSave={() => {}} onCancel={() => setGradingResult(null)} title="ورقة إجابة الطالب" />
+                <div className="w-full h-full bg-white rounded-[4rem] overflow-hidden shadow-2xl border-8 border-white flex items-center justify-center">
+                  <img src={gradingResult.handwrittenUrl} alt="Student Answer" className="max-w-full max-h-full object-contain" />
                 </div>
               ) : (
                 <div className="text-center text-slate-400 font-bold">هذا الاختبار لا يتضمن أوراقاً مرفوعة.</div>

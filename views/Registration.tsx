@@ -91,7 +91,7 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
     const newCode = generateStudentCode(formData.groupId);
     const selectedGroupName = groups.find(g => g.id === formData.groupId)?.name || 'عام';
 
-    // 2. Register Student with Active Status
+    // 2. Register Student with Pending Status
     onRegister({
       name: formData.name,
       studentPhone: formData.studentPhone,
@@ -99,11 +99,11 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
       yearId: formData.yearId,
       groupId: formData.groupId,
       avatar: formData.avatar,
-      studentCode: newCode, // Assign generated code immediately
+      studentCode: newCode, 
       attendance: false,
-      status: 'active', // Active immediately
+      status: 'pending', // CHANGED: Now pending by default
       registrationDate: new Date(formData.registrationDate).toLocaleDateString('ar-EG'),
-      isPaid: true // Assuming first entry is free or handled at desk
+      isPaid: false 
     });
 
     // 3. Show Success Screen
@@ -140,32 +140,30 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
                 <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-600"></div>
                 
                 <div className="mb-6">
-                    <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                        <span className="text-5xl">🎉</span>
+                    <div className="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                        <span className="text-5xl">⏳</span>
                     </div>
-                    <h2 className="text-3xl font-black text-slate-800">تم التسجيل بنجاح!</h2>
-                    <p className="text-slate-500 font-bold mt-2">أهلاً بك يا {successData.name.split(' ')[0]} في عائلة العباقرة</p>
+                    <h2 className="text-3xl font-black text-slate-800">تم إرسال الطلب!</h2>
+                    <p className="text-slate-500 font-bold mt-2">أهلاً بك يا {successData.name.split(' ')[0]}</p>
                 </div>
 
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-200 mb-8 relative">
                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">كود الدخول الخاص بك</p>
                     <h1 className="text-5xl font-black text-indigo-600 tracking-wider font-mono">{successData.code}</h1>
-                    <div className="mt-4 flex justify-center">
-                        <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold">
-                            {successData.group}
-                        </span>
-                    </div>
+                    <p className="text-xs text-amber-600 font-bold mt-4">
+                        يرجى الانتظار حتى يقوم الأستاذ {teacherName} بالموافقة على طلبك وتفعيل الحساب.
+                    </p>
                 </div>
 
                 <div className="space-y-3">
                     <p className="text-xs text-rose-500 font-bold bg-rose-50 p-3 rounded-xl">
-                        ⚠️ هام جداً: التقط صورة للشاشة (Screenshot) الآن واحتفظ بالكود، ستستخدمه للدخول وطباعته على الكارنيه.
+                        ⚠️ احتفظ بالكود، ستحتاجه للدخول بمجرد الموافقة.
                     </p>
                     <button 
                         onClick={onBack} 
                         className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-[1.02] transition-transform"
                     >
-                        تسجيل الدخول الآن 🚀
+                        العودة للرئيسية 🏠
                     </button>
                 </div>
             </div>
@@ -366,7 +364,7 @@ const Registration: React.FC<RegistrationProps> = ({ years, groups, onRegister, 
                         onClick={handleSubmit}
                         className="flex-1 py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-orange-900/40 hover:shadow-orange-600/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
                       >
-                         <span>تأكيد واستلام الكود</span>
+                         <span>تأكيد وإرسال الطلب</span>
                          <span>🚀</span>
                       </button>
                    </div>

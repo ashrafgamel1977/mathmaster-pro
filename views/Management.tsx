@@ -16,7 +16,7 @@ interface ManagementProps {
 
 const Management: React.FC<ManagementProps> = ({ 
   years, groups, students, 
-  onAddYear, onAddGroup, onDeleteGroup, onBatchGenerateCodes, platformName 
+  onAddYear, onAddGroup, onDeleteGroup, onBatchGenerateCodes, platformName, teacherName 
 }) => {
   const [newYear, setNewYear] = useState('');
   const [showCardsForGroup, setShowCardsForGroup] = useState<string | null>(null);
@@ -24,16 +24,29 @@ const Management: React.FC<ManagementProps> = ({
 
   const getStudentCount = (groupId: string) => students.filter(s => s.groupId === groupId).length;
 
-  // Helper to format code
-  const formatCode = (code: string) => {
-    return code;
+  const handleShareApp = () => {
+    const url = window.location.origin;
+    const message = `مرحباً بكم في منصة ${platformName} التعليمية 🎓\nمع الأستاذ/ ${teacherName}\n\nيمكنكم الدخول للتطبيق وتثبيته من خلال الرابط التالي:\n${url}\n\nبالتوفيق والنجاح! 🚀`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
     <div className="space-y-12 animate-slideUp pb-24 text-right font-['Cairo']" dir="rtl">
-      <div className="relative overflow-hidden rounded-[4rem] bg-[#0f172a] p-10 md:p-16 text-white shadow-2xl">
-        <h2 className="text-3xl md:text-5xl font-black">إدارة الصفوف والمجموعات 🏫</h2>
-        <p className="text-slate-400 font-medium mt-2">قم بتهيئة النظام الدراسي وإصدار بطاقات QR للطلاب.</p>
+      <div className="relative overflow-hidden rounded-[4rem] bg-[#0f172a] p-10 md:p-16 text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+        <div>
+            <h2 className="text-3xl md:text-5xl font-black">إدارة الصفوف والمجموعات 🏫</h2>
+            <p className="text-slate-400 font-medium mt-2">قم بتهيئة النظام الدراسي وإصدار بطاقات QR للطلاب.</p>
+        </div>
+        
+        {/* Share App Button */}
+        <button 
+            onClick={handleShareApp}
+            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[2rem] font-black text-sm shadow-xl flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
+        >
+            <span>نشر التطبيق للطلاب</span>
+            <span className="text-xl">📲</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

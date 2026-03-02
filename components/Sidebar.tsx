@@ -1,6 +1,9 @@
-
 import React, { useState } from 'react';
 import { AppView, PlatformSettings, Assistant } from '../types';
+import { 
+  Home, GraduationCap, BookOpen, PenTool, MessageSquare, 
+  Settings, LogOut, ChevronDown, ChevronUp, Circle, CheckCircle2
+} from 'lucide-react';
 
 interface SidebarProps {
   currentView: AppView | string;
@@ -10,181 +13,213 @@ interface SidebarProps {
   onUpdateSettings: (settings: PlatformSettings) => void;
   pendingCount?: number;
   unreadChatCount?: number;
-  unreadNotifCount?: number;
+  pendingStudentCount?: number;
   isConnected?: boolean;
+  onLogout?: () => void;
 }
 
-// All possible system views to iterate over if not explicitly defined
-const SYSTEM_VIEWS = [
-  AppView.DASHBOARD,
-  AppView.MANAGEMENT, // Added here to show in Sidebar
-  AppView.STUDENTS,
-  AppView.ASSIGNMENTS,
-  AppView.QUIZZES,
-  AppView.FILES,
-  AppView.LIVE_CLASS,
-  AppView.CHAT,
-  AppView.NOTIFICATIONS,
-  AppView.RESULTS,
-  AppView.REWARDS,
-  AppView.SCHEDULE,
-  AppView.AI_SOLVER,
-  AppView.FORMULAS,
-  AppView.LEADERBOARD,
-  AppView.CALL_CENTER,
-  AppView.TEST_CENTER,
-  AppView.LAUNCH_GUIDE,
-  AppView.STUDENT_PORTAL
+const MENU_GROUPS = [
+  { 
+    id: 'main', 
+    label: 'الرئيسية', 
+    icon: <Home size={18} />,
+    items: [AppView.DASHBOARD] 
+  },
+  { 
+    id: 'academic', 
+    label: 'الإدارة الأكاديمية', 
+    icon: <GraduationCap size={18} />,
+    items: [AppView.STUDENTS, AppView.MANAGEMENT, AppView.SCHEDULE] 
+  },
+  { 
+    id: 'content', 
+    label: 'المحتوى والاختبارات', 
+    icon: <BookOpen size={18} />,
+    items: [AppView.ASSIGNMENTS, AppView.QUIZZES, AppView.FILES, AppView.FORMULAS] 
+  },
+  { 
+    id: 'tools', 
+    label: 'أدوات الرياضيات', 
+    icon: <PenTool size={18} />,
+    items: [AppView.LIVE_CLASS, AppView.RESULTS] 
+  },
+  { 
+    id: 'communication', 
+    label: 'التواصل والمتابعة', 
+    icon: <MessageSquare size={18} />,
+    items: [AppView.CHAT, AppView.NOTIFICATIONS, AppView.LEADERBOARD] 
+  },
+  { 
+    id: 'admin', 
+    label: 'النظام والمتجر', 
+    icon: <Settings size={18} />,
+    items: [AppView.CONTROL_PANEL, AppView.TEST_CENTER, AppView.LAUNCH_GUIDE] 
+  }
 ];
 
 const DEFAULT_LABELS: Record<string, string> = {
-  [AppView.DASHBOARD]: 'الرئيسية',
+  [AppView.DASHBOARD]: 'غرفة العمليات',
   [AppView.MANAGEMENT]: 'المجموعات',
   [AppView.STUDENT_PORTAL]: 'بوابة الطالب',
-  [AppView.STUDENTS]: 'الطلاب',
+  [AppView.STUDENTS]: 'سجل الطلاب',
   [AppView.ASSIGNMENTS]: 'الواجبات',
-  [AppView.QUIZZES]: 'الاختبارات',
-  [AppView.FILES]: 'المكتبة',
-  [AppView.LIVE_CLASS]: 'بث مباشر',
-  [AppView.CHAT]: 'المحادثات',
+  [AppView.QUIZZES]: 'بنك الاختبارات',
+  [AppView.FILES]: 'المكتبة الرقمية',
+  [AppView.LIVE_CLASS]: 'البث المباشر',
+  [AppView.CHAT]: 'غرف النقاش',
   [AppView.NOTIFICATIONS]: 'التنبيهات',
-  [AppView.RESULTS]: 'النتائج',
-  [AppView.REWARDS]: 'المتجر',
-  [AppView.SCHEDULE]: 'الجدول',
-  [AppView.AI_SOLVER]: 'المحلل',
+  [AppView.RESULTS]: 'النتائج والتحليل',
+  [AppView.REWARDS]: 'متجر الجوائز',
+  [AppView.SCHEDULE]: 'الجدول الدراسي',
   [AppView.FORMULAS]: 'القوانين',
-  [AppView.LEADERBOARD]: 'المتصدرين',
-  [AppView.CALL_CENTER]: 'اتصالات',
-  [AppView.TEST_CENTER]: 'تقني',
-  [AppView.LAUNCH_GUIDE]: 'دليل',
-  [AppView.CONTROL_PANEL]: 'الإعدادات'
+  [AppView.LEADERBOARD]: 'لوحة الشرف',
+  [AppView.CALL_CENTER]: 'مركز الاتصال',
+  [AppView.TEST_CENTER]: 'فحص النظام',
+  [AppView.LAUNCH_GUIDE]: 'دليل البدء',
+  [AppView.CONTROL_PANEL]: 'الإعدادات العامة',
+  [AppView.BATTLE_ARENA]: 'ساحة المعركة ⚔️'
 };
 
-const DEFAULT_ICONS: Record<string, string> = {
-  [AppView.DASHBOARD]: '🏠',
-  [AppView.MANAGEMENT]: '🏫',
-  [AppView.STUDENT_PORTAL]: '🎓',
-  [AppView.STUDENTS]: '👥',
-  [AppView.ASSIGNMENTS]: '📝',
-  [AppView.QUIZZES]: '⚡',
-  [AppView.FILES]: '📚',
-  [AppView.LIVE_CLASS]: '🎥',
-  [AppView.CHAT]: '💬',
-  [AppView.NOTIFICATIONS]: '🔔',
-  [AppView.RESULTS]: '📊',
-  [AppView.REWARDS]: '🎁',
-  [AppView.SCHEDULE]: '📅',
-  [AppView.AI_SOLVER]: '🧠',
-  [AppView.FORMULAS]: '📐',
-  [AppView.LEADERBOARD]: '🏆',
-  [AppView.CALL_CENTER]: '📞',
-  [AppView.TEST_CENTER]: '🧪',
-  [AppView.LAUNCH_GUIDE]: '🚀',
-  [AppView.CONTROL_PANEL]: '⚙️'
-};
-
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, loggedUser, pendingCount = 0, unreadChatCount = 0, isConnected = false }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, loggedUser, pendingCount = 0, unreadChatCount = 0, pendingStudentCount = 0, isConnected = false, onLogout }) => {
+  const [openGroups, setOpenGroups] = useState<string[]>(['main', 'academic', 'content', 'tools']); // Default open groups
   const isAssistant = loggedUser?.role === 'assistant';
   const assistantPermissions = isAssistant ? (loggedUser as Assistant).permissions : null;
   const primaryColor = settings?.branding?.primaryColor || '#2563eb';
 
-  // Helper to check permission and visibility
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
+  };
+
   const canAccess = (viewId: string, isCustom: boolean) => {
-    // 1. Assistant Permission Check
     if (isAssistant && assistantPermissions) {
-        if (viewId === AppView.CONTROL_PANEL) return false; // Assistants can't access settings usually
-        if (isCustom) return true; // Assuming assistants can view custom sections if they exist
+        if (viewId === AppView.CONTROL_PANEL) return false; 
+        if (isCustom) return true; 
         if (!assistantPermissions.includes(viewId as AppView) && viewId !== AppView.DASHBOARD) return false;
     }
-
-    // 2. Settings Visibility Check (For system views)
     if (!isCustom) {
         const enabled = settings.enabledViews || Object.values(AppView);
         if (!enabled.includes(viewId as AppView) && viewId !== AppView.CONTROL_PANEL) return false;
     }
-
     return true;
   };
 
-  const renderItem = (id: string, defaultIcon: string, defaultLabel: string, badge?: number, isCustom = false) => {
-    if (!canAccess(id, isCustom)) return null;
+  const renderItem = (id: string, labelOverride?: string) => {
+    if (!canAccess(id, false)) return null;
     
     const isActive = currentView === id;
-    const label = isCustom ? defaultLabel : (settings.viewLabels?.[id] || defaultLabel);
-    const icon = isCustom ? defaultIcon : (settings.viewIcons?.[id] || defaultIcon);
+    const label = settings.viewLabels?.[id] || labelOverride || DEFAULT_LABELS[id] || id;
+    
+    let badge = 0;
+    if (id === AppView.ASSIGNMENTS) badge = pendingCount;
+    if (id === AppView.CHAT) badge = unreadChatCount;
+    if (id === AppView.STUDENTS) badge = pendingStudentCount;
 
     return (
-      <div key={id} className="relative w-full group/item">
-        <button
-          onClick={() => setView(id)}
-          className={`relative w-full aspect-square flex flex-col items-center justify-center rounded-[1.5rem] mb-3 transition-all duration-300 ${
-            isActive 
-              ? 'text-white shadow-lg scale-105' 
-              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-          }`}
-          style={{ 
-            backgroundColor: isActive ? primaryColor : 'transparent',
-            boxShadow: isActive ? `0 8px 20px -6px ${primaryColor}66` : 'none'
-          }}
-          title={label}
-        >
-          <span className={`text-2xl mb-1 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</span>
-          <span className={`text-[9px] font-black ${isActive ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100 absolute -bottom-2 bg-slate-800 text-white px-2 py-1 rounded-lg z-50 whitespace-nowrap transition-opacity delay-75'}`}>
-            {label}
+      <button
+        key={id}
+        onClick={() => setView(id)}
+        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 mb-1 relative group ${
+          isActive 
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+        }`}
+      >
+        <span className={`transition-transform ${isActive ? 'scale-110' : ''}`}>
+           {isActive ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+        </span>
+        <span className={`text-xs font-bold ${isActive ? 'opacity-100' : 'opacity-80'}`}>{label}</span>
+        
+        {badge > 0 && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-sm">
+            {badge}
           </span>
-          
-          {badge ? (
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full animate-pulse"></span>
-          ) : null}
-        </button>
-      </div>
+        )}
+      </button>
     );
   };
 
   return (
-    <aside className="hidden lg:flex w-24 bg-white border-l border-slate-100 h-screen sticky top-0 flex-col items-center py-6 z-50 overflow-y-auto no-scrollbar shadow-sm">
+    <aside className="hidden lg:flex w-72 bg-white border-l border-slate-100 h-screen sticky top-0 flex-col z-50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] overflow-hidden font-['Cairo']">
       
-      {/* Logo */}
-      <div className="mb-8 cursor-pointer hover:scale-105 transition-transform" onClick={() => setView(AppView.DASHBOARD)}>
+      {/* Brand Header */}
+      <div className="p-6 border-b border-slate-50 flex items-center gap-3 cursor-pointer" onClick={() => setView(AppView.DASHBOARD)}>
         {settings.branding?.logoUrl ? (
-           <img src={settings.branding.logoUrl} className="w-12 h-12 object-contain rounded-xl" alt="Logo" />
+           <img src={settings.branding.logoUrl} className="w-10 h-10 object-contain rounded-xl" alt="Logo" />
         ) : (
-           <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg" style={{ backgroundColor: primaryColor }}>∑</div>
+           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200" style={{ backgroundColor: primaryColor }}>∑</div>
         )}
-        <div className={`mt-2 w-1.5 h-1.5 rounded-full mx-auto ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+        <div>
+            <h1 className="font-black text-slate-800 text-sm leading-tight">{settings.platformName}</h1>
+            <div className="flex items-center gap-1.5 mt-1">
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+                <span className="text-[9px] font-bold text-slate-400">{isConnected ? 'متصل بالشبكة' : 'وضع محلي'}</span>
+            </div>
+        </div>
       </div>
 
-      <nav className="flex-1 w-full px-3 flex flex-col gap-1">
-        {/* Always Dashboard first */}
-        {renderItem(AppView.DASHBOARD, DEFAULT_ICONS[AppView.DASHBOARD], DEFAULT_LABELS[AppView.DASHBOARD])}
-        
-        <div className="w-8 h-px bg-slate-100 mx-auto my-2"></div>
-        
-        {/* Render all other system views based on enabled list */}
-        {SYSTEM_VIEWS.filter(v => v !== AppView.DASHBOARD && v !== AppView.CONTROL_PANEL).map(viewId => {
-            let badge = 0;
-            if (viewId === AppView.ASSIGNMENTS) badge = pendingCount;
-            if (viewId === AppView.CHAT) badge = unreadChatCount;
-            return renderItem(viewId, DEFAULT_ICONS[viewId] || '🔹', DEFAULT_LABELS[viewId] || viewId, badge);
+      {/* Scrollable Menu */}
+      <nav className="flex-1 overflow-y-auto p-4 no-scrollbar space-y-2">
+        {MENU_GROUPS.map(group => {
+            // Filter items based on permissions first to see if group should render
+            const visibleItems = group.items.filter(id => canAccess(id, false));
+            if (visibleItems.length === 0) return null;
+
+            const isOpen = openGroups.includes(group.id);
+
+            return (
+                <div key={group.id} className="mb-2">
+                    <button 
+                        onClick={() => toggleGroup(group.id)}
+                        className="w-full flex items-center justify-between px-2 py-2 text-slate-400 hover:text-slate-600 transition-colors group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <span className="opacity-70 group-hover:opacity-100 transition-opacity text-indigo-500">{group.icon}</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider">{group.label}</span>
+                        </div>
+                        <span className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                            <ChevronDown size={14} />
+                        </span>
+                    </button>
+                    
+                    <div className={`space-y-0.5 overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[500px] opacity-100 pt-1' : 'max-h-0 opacity-0'}`}>
+                        {visibleItems.map(viewId => renderItem(viewId))}
+                    </div>
+                </div>
+            );
         })}
 
         {/* Custom Sections */}
         {settings.customSections && settings.customSections.length > 0 && (
-            <div className="w-8 h-px bg-slate-100 mx-auto my-2"></div>
+            <div className="mt-4 pt-4 border-t border-slate-50">
+                <p className="px-2 text-[9px] font-black text-slate-400 mb-2 uppercase tracking-widest">أقسام مخصصة</p>
+                {settings.customSections.map(s => (
+                    <button
+                        key={s.id}
+                        onClick={() => setView(s.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 mb-1 ${
+                            currentView === s.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                    >
+                        <span className="text-lg">{s.icon}</span>
+                        <span className="text-xs">{s.title}</span>
+                    </button>
+                ))}
+            </div>
         )}
-        {settings.customSections?.map(s => renderItem(s.id, s.icon, s.title, 0, true))}
-
-        <div className="mt-auto">
-           {/* Settings/Control Panel - Always available for Teacher */}
-           {!isAssistant && renderItem(AppView.CONTROL_PANEL, DEFAULT_ICONS[AppView.CONTROL_PANEL], DEFAULT_LABELS[AppView.CONTROL_PANEL])}
-        </div>
       </nav>
-      
-      {isAssistant && (
-         <button onClick={() => window.location.reload()} className="mt-4 text-rose-300 hover:text-rose-500 transition-colors p-2" title="تسجيل خروج">
-           <span className="text-xl">🚪</span>
-         </button>
-      )}
+
+      {/* Footer Actions */}
+      <div className="p-4 border-t border-slate-50 bg-slate-50/50">
+         {onLogout && (
+            <button 
+              onClick={onLogout} 
+              className="w-full flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-all" 
+            >
+              <span>تسجيل الخروج</span>
+              <LogOut size={16} />
+            </button>
+         )}
+      </div>
     </aside>
   );
 };

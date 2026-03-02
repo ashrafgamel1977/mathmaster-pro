@@ -10,15 +10,13 @@ import Management from './Management';
 import QuizResults from './QuizResults';
 import Notifications from './Notifications';
 import Leaderboard from './Leaderboard';
-import CallCenter from './CallCenter';
 import Settings from './Settings';
 import TestCenter from './TestCenter';
 import LaunchGuide from './LaunchGuide';
-import Rewards from './Rewards';
 import Schedules from './Schedules';
 import Sections from './Sections';
+// The QuizGenerator component is available here
 import QuizGenerator from './QuizGenerator'; 
-import FilesView from './Files'; 
 
 interface AdminControlPanelProps {
   activeTab: string;
@@ -30,11 +28,7 @@ interface AdminControlPanelProps {
   results: QuizResult[];
   settings: PlatformSettings;
   assistants: Assistant[];
-  inquiries: ParentInquiry[];
-  callLogs: CallLog[];
   schedules: ScheduleEntry[];
-  rewards: PlatformReward[];
-  redemptions: RewardRedemption[];
   quizzes: Quiz[];
   assignments: Assignment[];
   submissions: AssignmentSubmission[];
@@ -44,15 +38,10 @@ interface AdminControlPanelProps {
   onAddYear: (n: string) => void;
   onAddGroup: (n: string, y: string, t: string, ty: 'center' | 'online', g: 'boys' | 'girls' | 'mixed', c: number, p: string) => void;
   onDeleteGroup: (id: string) => void;
-  onUpdateInquiry: (id: string, s: ParentInquiry['status']) => void;
-  onAddCallLog: (l: Omit<CallLog, 'id'>) => void;
   onSendNotif: (n: any, p: boolean) => void;
   onDeleteNotif: (id: string) => void;
   onMarkNotifRead: (id: string) => void;
   onUpdateResult: (id: string, s: number, f: string) => void;
-  onAddReward: (r: any) => void;
-  onDeleteReward: (id: string) => void;
-  onMarkRewardDelivered: (id: string) => void;
   onAddSchedule: (s: any) => void;
   onDeleteSchedule: (id: string) => void;
   onMockData: (data: any) => void;
@@ -68,8 +57,6 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
   const ALL_TABS = useMemo(() => [
     { id: 'groups', label: 'المجموعات', icon: '🏫', permission: AppView.MANAGEMENT },
     { id: 'results', label: 'النتائج', icon: '📊', permission: AppView.RESULTS },
-    { id: 'comms', label: 'التواصل', icon: '📞', permission: AppView.CALL_CENTER },
-    { id: 'store', label: 'المكافآت', icon: '🎁', permission: AppView.REWARDS },
     { id: 'sections', label: 'الأقسام', icon: '🧩', permission: AppView.SECTIONS },
     { id: 'settings', label: 'الإعدادات', icon: '⚙️', permission: AppView.SETTINGS },
     { id: 'tech', label: 'التقني', icon: '🧪', permission: AppView.TEST_CENTER },
@@ -95,7 +82,7 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
     switch (props.activeTab) {
       case 'groups':
         return (
-          <div className="space-y-12">
+          <div className="space-y-12 animate-fadeIn">
             <Management 
               years={props.years} groups={props.groups} students={props.students} 
               onAddYear={props.onAddYear} onAddGroup={props.onAddGroup} onDeleteGroup={props.onDeleteGroup}
@@ -108,66 +95,46 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
         );
       case 'results':
         return (
-          <QuizResults 
-            results={props.results} students={props.students} notifications={props.notifications}
-            onIssueCertificate={() => {}} onUpdateResult={props.onUpdateResult} notation={props.settings.mathNotation}
-          />
-        );
-      case 'comms':
-        return (
-          <div className="space-y-12">
-            <CallCenter 
-              inquiries={props.inquiries} callLogs={props.callLogs} students={props.students}
-              onUpdateInquiry={props.onUpdateInquiry} onAddCallLog={props.onAddCallLog} teacherName={props.settings.teacherName}
+          <div className="animate-fadeIn">
+            <QuizResults 
+              results={props.results} students={props.students} notifications={props.notifications}
+              onIssueCertificate={() => {}} onUpdateResult={props.onUpdateResult} notation={props.settings.mathNotation}
             />
-            <div className="border-t border-slate-100 pt-12">
-              <Notifications 
-                notifications={props.notifications} years={props.years} groups={props.groups} role="teacher"
-                onSend={props.onSendNotif} onMarkRead={props.onMarkNotifRead} onDelete={props.onDeleteNotif}
-              />
-            </div>
-            <div className="border-t border-slate-100 pt-12">
-               <Leaderboard students={props.students} years={props.years} />
-            </div>
           </div>
-        );
-      case 'store':
-        return (
-          <Rewards 
-            rewards={props.rewards} redemptions={props.redemptions} role="teacher"
-            onAddReward={props.onAddReward} onDeleteReward={props.onDeleteReward} onRedeem={()=>{}} onMarkDelivered={props.onMarkRewardDelivered}
-          />
         );
       case 'sections':
         return (
-          <Sections 
-            sections={props.settings.customSections || []} 
-            onUpdateSections={(secs) => props.onUpdateSettings({...props.settings, customSections: secs})} 
-          />
+          <div className="animate-fadeIn">
+            <Sections 
+              sections={props.settings.customSections || []} 
+              onUpdateSections={(secs) => props.onUpdateSettings({...props.settings, customSections: secs})} 
+            />
+          </div>
         );
       case 'settings':
         return (
-          <Settings 
-            settings={props.settings} 
-            assistants={props.assistants} 
-            onUpdate={props.onUpdateSettings} 
-            onAddAssistant={props.onAddAssistant} 
-            onDeleteAssistant={props.onDeleteAssistant}
-            // Passing data for dashboards
-            students={props.students}
-            submissions={props.submissions}
-            inquiries={props.inquiries}
-            notifications={props.notifications}
-          />
+          <div className="animate-fadeIn">
+            <Settings 
+              settings={props.settings} 
+              assistants={props.assistants} 
+              onUpdate={props.onUpdateSettings} 
+              onAddAssistant={props.onAddAssistant} 
+              onDeleteAssistant={props.onDeleteAssistant}
+              students={props.students}
+              submissions={props.submissions}
+              inquiries={props.inquiries}
+              notifications={props.notifications}
+            />
+          </div>
         );
       case 'tech':
         return (
-          <div className="space-y-12">
+          <div className="space-y-12 animate-fadeIn">
             <TestCenter 
               students={props.students} years={props.years} groups={props.groups} quizzes={props.quizzes} assignments={props.assignments} settings={props.settings}
               onMockData={props.onMockData} onEnterSimulation={props.onEnterSimulation} addToast={props.addToast}
             />
-            <div className="border-t border-slate-120 pt-12">
+            <div className="border-t border-slate-100 pt-12">
                <LaunchGuide groups={props.groups} years={props.years} teacherName={props.settings.teacherName} platformName={props.settings.platformName} addToast={props.addToast} />
             </div>
           </div>
@@ -178,7 +145,7 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
   };
 
   return (
-    <div className="min-h-screen space-y-10 animate-fadeIn text-right font-['Cairo'] pb-40" dir="rtl">
+    <div className="min-h-screen space-y-10 animate-fadeIn text-right font-['Cairo'] pb-48" dir="rtl">
       {/* Central Header with Quick Toggles */}
       <div className="relative overflow-hidden rounded-[4rem] bg-[#0f172a] p-12 md:p-16 text-white shadow-2xl border border-white/5">
         <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,_rgba(59,130,246,0.15),transparent_60%)]"></div>
@@ -231,7 +198,7 @@ const AdminControlPanel: React.FC<AdminControlPanelProps> = (props) => {
       </div>
 
       {/* Dynamic Content Area */}
-      <div className="max-w-7xl mx-auto px-4 animate-slideUp">
+      <div className="max-w-7xl mx-auto px-4 min-h-[60vh]">
          {renderActiveContent()}
       </div>
     </div>

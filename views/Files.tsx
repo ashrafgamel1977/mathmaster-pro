@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Year, VideoLesson, Student, VideoView, EducationalSource, PlatformSettings, AppView } from '../types';
-import { extractTextFromMedia } from '../services/geminiService';
+import { Year, VideoLesson, Student, VideoView, EducationalSource, PlatformSettings, AppView, Folder } from '../types';
 import ProtectedVideo from '../components/ProtectedVideo';
 
 interface FilesViewProps {
@@ -10,18 +9,25 @@ interface FilesViewProps {
   educationalSources: EducationalSource[];
   students: Student[];
   videoViews: VideoView[];
+  folders: Folder[];
   onAddVideo: (video: VideoLesson) => void;
   onDeleteVideo: (id: string) => void;
   onAddSource: (source: EducationalSource) => void;
   onDeleteSource: (id: string) => void;
+  onAddFolder: (folder: Folder) => void;
+  onDeleteFolder: (id: string) => void;
   settings?: PlatformSettings;
 }
 
-const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalSources, students, videoViews, onAddVideo, onDeleteVideo, onAddSource, onDeleteSource, settings }) => {
-  const [activeTab, setActiveTab] = useState<string>('videos');
+const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalSources, students, videoViews, folders, onAddVideo, onDeleteVideo, onAddSource, onDeleteSource, onAddFolder, onDeleteFolder, settings }) => {
+  const activeTabState = useState<string>('videos');
+  const activeTab = activeTabState[0];
+  const setActiveTab = activeTabState[1];
+
   const [showAddVideo, setShowAddVideo] = useState(false);
   const [showAddDoc, setShowAddDoc] = useState(false);
-  const [showAddRef, setShowAddRef] = useState(false);
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   
   // Filters
   const [filterYearId, setFilterYearId] = useState<string>('all');
@@ -31,9 +37,8 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
   // Preview State
   const [previewVideo, setPreviewVideo] = useState<VideoLesson | null>(null);
   
-  // Extraction State
-  const [isExtracting, setIsExtracting] = useState(false);
-  const refFileInputRef = useRef<HTMLInputElement>(null);
+  // Folder State
+  const [newFolder, setNewFolder] = useState<{ name: string, yearId: string, color: string }>({ name: '', yearId: '', color: 'blue' });
 
   // Video State
   const [newVideo, setNewVideo] = useState<{
@@ -48,15 +53,11 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
     name: string, yearId: string, data: string, mimeType: string, linkUrl: string, term: '1' | '2', subject: string
   }>({ name: '', yearId: '', data: '', mimeType: '', linkUrl: '', term: '1', subject: '' });
   
-  // Reference State
-  const [newRef, setNewRef] = useState({ name: '', yearId: '', textContent: '' });
-
   const docInputRef = useRef<HTMLInputElement>(null);
 
   const DEFAULT_TABS: { id: string; label: string; icon: string; disabled?: boolean }[] = [
     { id: 'videos', label: '🎬 فيديوهات', icon: '🎬' },
-    { id: 'docs', label: '📚 كتب وملازم', icon: '📚' },
-    { id: 'refs', label: '🧠 المراجع المعتمدة (AI)', icon: '🧠' }
+    { id: 'docs', label: '📚 كتب وملازم', icon: '📚' }
   ];
 
   const tabs = React.useMemo(() => {
@@ -93,23 +94,56 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
 
   const filteredSources = useMemo(() => {
     let sources = educationalSources;
-    if (activeTab === 'docs') sources = sources.filter(s => !s.isAiReference);
-    if (activeTab === 'refs') sources = sources.filter(s => s.isAiReference);
 
     if (filterYearId !== 'all') sources = sources.filter(s => s.yearId === filterYearId);
     if (filterTerm !== 'all') sources = sources.filter(s => s.term === filterTerm);
     if (filterSubject !== 'all') sources = sources.filter(s => s.subject === filterSubject);
 
+    if (activeFolderId) {
+        sources = sources.filter(s => s.folderId === activeFolderId);
+    } else {
+        sources = sources.filter(s => !s.folderId);
+    }
+
     return sources;
-  }, [educationalSources, filterYearId, filterTerm, filterSubject, activeTab]);
+  }, [educationalSources, filterYearId, filterTerm, filterSubject, activeTab, activeFolderId]);
 
   const filteredVideos = useMemo(() => {
     let videos = videoLessons;
     if (filterYearId !== 'all') videos = videos.filter(v => v.yearId === filterYearId);
     if (filterTerm !== 'all') videos = videos.filter(v => v.term === filterTerm);
     if (filterSubject !== 'all') videos = videos.filter(v => v.subject === filterSubject);
+    
+    if (activeFolderId) {
+        videos = videos.filter(v => v.folderId === activeFolderId);
+    } else {
+        videos = videos.filter(v => !v.folderId);
+    }
+
     return videos;
-  }, [videoLessons, filterYearId, filterTerm, filterSubject]);
+  }, [videoLessons, filterYearId, filterTerm, filterSubject, activeFolderId]);
+
+  const currentFolders = useMemo(() => {
+      if (activeFolderId) return []; // No nested folders for now
+      let f = folders.filter(f => f.type === (activeTab === 'videos' ? 'video' : 'doc'));
+      if (filterYearId !== 'all') f = f.filter(x => x.yearId === filterYearId);
+      return f;
+  }, [folders, activeTab, filterYearId, activeFolderId]);
+
+  const handleAddFolder = () => {
+    if (!newFolder.name || !newFolder.yearId) return alert('يرجى إكمال البيانات');
+    
+    onAddFolder({
+      id: '',
+      name: newFolder.name,
+      type: activeTab === 'videos' ? 'video' : 'doc',
+      yearId: newFolder.yearId,
+      color: newFolder.color,
+      createdAt: new Date().toISOString()
+    });
+    setShowAddFolder(false);
+    setNewFolder({ name: '', yearId: '', color: 'blue' });
+  };
 
   const handleAddVideoLocal = () => {
     if(!newVideo.title || !newVideo.url || !newVideo.yearId) return alert('يرجى إكمال البيانات');
@@ -126,7 +160,8 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
       yearId: newVideo.yearId,
       uploadDate: new Date().toLocaleDateString('ar-EG'),
       term: newVideo.term,
-      subject: newVideo.subject || 'عام'
+      subject: newVideo.subject || 'عام',
+      folderId: activeFolderId || undefined
     });
     setShowAddVideo(false);
     setNewVideo({ title: '', url: '', yearId: '', provider: 'youtube', term: '1', subject: '' });
@@ -161,54 +196,11 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
       uploadDate: new Date().toLocaleDateString('ar-EG'),
       isAiReference: false,
       term: newDoc.term,
-      subject: newDoc.subject || 'عام'
+      subject: newDoc.subject || 'عام',
+      folderId: activeFolderId || undefined
     });
     setShowAddDoc(false);
     setNewDoc({ name: '', yearId: '', data: '', mimeType: '', linkUrl: '', term: '1', subject: '' });
-  };
-
-  // ... (Existing Reference Logic) ...
-  const handleAddReference = () => {
-    if (!newRef.name || !newRef.yearId || !newRef.textContent) return alert('يرجى إدخال اسم المرجع والنص المحتوي.');
-    onAddSource({
-      id: 'ref' + Date.now(),
-      name: newRef.name,
-      data: '', 
-      mimeType: 'text/plain',
-      yearId: newRef.yearId,
-      uploadDate: new Date().toLocaleDateString('ar-EG'),
-      isAiReference: true,
-      textContent: newRef.textContent,
-      subject: 'reference'
-    });
-    setShowAddRef(false);
-    setNewRef({ name: '', yearId: '', textContent: '' });
-    alert("تم إضافة المرجع بنجاح.");
-  };
-
-  const handleRefFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-        setIsExtracting(true);
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const base64 = ev.target?.result as string;
-            try {
-                const text = await extractTextFromMedia({ data: base64, mimeType: file.type });
-                setNewRef(prev => ({ 
-                    ...prev, 
-                    textContent: (prev.textContent ? prev.textContent + "\n\n" : "") + text,
-                    name: prev.name || file.name.split('.')[0]
-                }));
-                alert("تم استخراج النص من الملف بنجاح!");
-            } catch (error) {
-                alert("فشل استخراج النص.");
-            } finally {
-                setIsExtracting(false);
-            }
-        };
-        reader.readAsDataURL(file);
-    }
   };
 
   // Extract unique subjects for filter dropdown
@@ -264,20 +256,35 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
          </div>
 
          <div className="flex gap-3 w-full md:w-auto overflow-x-auto no-scrollbar">
+            {activeFolderId && (
+                <button onClick={() => setActiveFolderId(null)} className="px-6 py-5 bg-slate-100 text-slate-600 rounded-[2rem] font-black text-xs hover:bg-slate-200 transition-all">🔙 العودة</button>
+            )}
+            {!activeFolderId && (activeTab === 'videos' || activeTab === 'docs') && (
+                <button onClick={() => setShowAddFolder(true)} className="px-6 py-5 bg-amber-100 text-amber-700 rounded-[2rem] font-black text-xs hover:bg-amber-200 transition-all whitespace-nowrap">📁 مجلد جديد</button>
+            )}
             {activeTab === 'videos' && (
                 <button onClick={() => setShowAddVideo(true)} className="px-10 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs shadow-2xl hover:scale-105 transition-all whitespace-nowrap">إضافة فيديو ＋</button>
             )}
             {activeTab === 'docs' && (
                 <button onClick={() => setShowAddDoc(true)} className="px-10 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs shadow-2xl hover:scale-105 transition-all whitespace-nowrap">إضافة كتاب/ملزمة ＋</button>
             )}
-            {activeTab === 'refs' && (
-                <button onClick={() => setShowAddRef(true)} className="px-10 py-5 bg-amber-600 text-white rounded-[2rem] font-black text-xs shadow-2xl hover:scale-105 transition-all whitespace-nowrap">إضافة مرجع منهج (Grounding) ＋</button>
-            )}
          </div>
       </div>
 
       {/* Grid Content */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+         {/* Folders */}
+         {currentFolders.map(folder => (
+            <div key={folder.id} onClick={() => setActiveFolderId(folder.id)} className="bg-amber-50 rounded-[3rem] p-8 border-2 border-amber-100 cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                    <span className="text-4xl">📁</span>
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); }} className="w-8 h-8 bg-white text-rose-400 rounded-full flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">🗑️</button>
+                </div>
+                <h3 className="text-lg font-black text-slate-800 mb-1">{folder.name}</h3>
+                <p className="text-xs font-bold text-amber-600">{years.find(y => y.id === folder.yearId)?.name}</p>
+            </div>
+         ))}
+
          {activeTab === 'videos' && (
            filteredVideos.map(video => (
              <div key={video.id} className="bg-white rounded-[3.5rem] overflow-hidden shadow-xl border border-slate-100 group flex flex-col justify-between">
@@ -313,7 +320,7 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
            ))
          )}
          
-         {(activeTab === 'docs' || activeTab === 'refs') && (
+         {(activeTab === 'docs') && (
            filteredSources.map(doc => (
              <div key={doc.id} className={`p-8 rounded-[3rem] flex flex-col gap-6 group border shadow-sm hover:shadow-xl transition-all ${doc.isAiReference ? 'bg-amber-50 border-amber-100' : 'bg-white border-slate-100'}`}>
                 <div className="flex items-center gap-4">
@@ -327,7 +334,6 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
                      </div>
                      <h4 className="font-black text-slate-800 text-sm md:text-md truncate">{doc.name}</h4>
                      {doc.subject && <p className="text-[10px] font-bold text-indigo-500 mt-1">{doc.subject}</p>}
-                     {doc.isAiReference && <span className="text-[8px] bg-amber-200 px-2 py-0.5 rounded text-amber-800 font-bold block w-fit mt-1">مصدر ذكاء اصطناعي</span>}
                   </div>
                 </div>
                 
@@ -336,7 +342,7 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
                       <a href={doc.data} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 flex items-center gap-2 hover:underline">
                          <span>🔗</span> فتح الرابط
                       </a>
-                   ) : !doc.isAiReference && (
+                   ) : (
                       <a href={doc.data} download={doc.name} className="text-xs font-bold text-indigo-600 flex items-center gap-2 hover:underline">
                          <span>⬇</span> تحميل
                       </a>
@@ -354,6 +360,26 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
             </div>
          )}
       </div>
+
+      {/* Add Folder Modal */}
+      {showAddFolder && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+           <div className="bg-white p-10 rounded-[3rem] w-full max-w-lg space-y-4 shadow-2xl">
+              <h3 className="text-xl font-black text-slate-800">إنشاء مجلد جديد 📁</h3>
+              <input type="text" placeholder="اسم المجلد" className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={newFolder.name} onChange={e => setNewFolder({...newFolder, name: e.target.value})} />
+              
+              <select className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-xs outline-none cursor-pointer" value={newFolder.yearId} onChange={e => setNewFolder({...newFolder, yearId: e.target.value})}>
+                 <option value="">الصف الدراسي</option>
+                 {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+              </select>
+
+              <div className="flex gap-2 pt-4">
+                 <button onClick={handleAddFolder} className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition-all">إنشاء ✓</button>
+                 <button onClick={() => setShowAddFolder(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black">إلغاء</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Add Video Modal */}
       {showAddVideo && (
@@ -495,63 +521,6 @@ const FilesView: React.FC<FilesViewProps> = ({ years, videoLessons, educationalS
                  <button onClick={() => setShowAddDoc(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black">إلغاء</button>
               </div>
            </div>
-        </div>
-      )}
-
-      {/* Add Reference Modal */}
-      {showAddRef && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-white w-full max-w-2xl p-10 rounded-[3rem] shadow-2xl space-y-6 relative overflow-y-auto max-h-[90vh]">
-             <button onClick={() => setShowAddRef(false)} className="absolute top-8 left-8 w-10 h-10 bg-slate-100 rounded-full text-slate-500">✕</button>
-             <div>
-                <h3 className="text-2xl font-black text-slate-800">إضافة مرجع منهجي (Grounding)</h3>
-                <p className="text-slate-500 text-xs font-bold mt-2">سيتم إجبار الذكاء الاصطناعي على استخدام النص الذي تدخله هنا فقط عند الشرح أو وضع الأسئلة لهذا الصف.</p>
-             </div>
-
-             <div className="space-y-4">
-                <div className="flex gap-4">
-                   <input type="text" placeholder="اسم المرجع (مثال: كتاب الوزارة - جبر)" className="flex-1 px-6 py-4 bg-slate-50 rounded-2xl outline-none border focus:border-amber-500" value={newRef.name} onChange={e => setNewRef({...newRef, name: e.target.value})} />
-                   <select className="px-6 py-4 bg-slate-50 rounded-2xl outline-none border focus:border-amber-500" value={newRef.yearId} onChange={e => setNewRef({...newRef, yearId: e.target.value})}>
-                      <option value="">الصف الدراسي</option>
-                      {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
-                   </select>
-                </div>
-
-                <div className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-3">
-                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">خيار سريع: استخراج النص من ملف (PDF / صورة)</p>
-                    <button 
-                        onClick={() => refFileInputRef.current?.click()} 
-                        disabled={isExtracting}
-                        className="w-full py-4 bg-white border border-amber-200 text-amber-600 rounded-xl font-bold text-sm shadow-sm hover:bg-amber-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isExtracting ? (
-                            <>
-                                <span className="animate-spin h-4 w-4 border-2 border-amber-600 border-t-transparent rounded-full"></span>
-                                <span>جاري قراءة الملف...</span>
-                            </>
-                        ) : (
-                            <>
-                                <span>رفع ملف لاستخراج النص</span>
-                                <span className="text-lg">📤</span>
-                            </>
-                        )}
-                    </button>
-                    <input type="file" ref={refFileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleRefFileUpload} />
-                </div>
-                
-                <div className="relative">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block px-2">النص المعتمد (المنهج)</label>
-                   <textarea 
-                     placeholder="انسخ والصق نص المنهج هنا، أو استخدم زر الرفع أعلاه لاستخراجه تلقائياً..."
-                     className="w-full p-6 bg-slate-50 rounded-2xl font-medium text-sm h-64 outline-none border-2 border-dashed border-slate-200 focus:border-amber-500 resize-none"
-                     value={newRef.textContent}
-                     onChange={e => setNewRef({...newRef, textContent: e.target.value})}
-                   />
-                </div>
-
-                <button onClick={handleAddReference} className="w-full py-5 bg-amber-600 text-white rounded-2xl font-black shadow-xl hover:scale-[1.01] transition-all">حفظ المرجع واعتماده ✓</button>
-             </div>
-          </div>
         </div>
       )}
 

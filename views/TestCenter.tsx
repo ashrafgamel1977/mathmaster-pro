@@ -1,9 +1,7 @@
 
 import React, { useState } from 'react';
 import { Student, Year, Group, Quiz, Assignment, PlatformSettings } from '../types';
-import { generateQuizFromContent } from '../services/geminiService';
-import InteractiveBoard from '../components/InteractiveBoard';
-import { getFirebaseInitError, db } from '../firebaseConfig';
+import { getFirebaseInitError, db, isUsingDefaultConfig } from '../firebaseConfig';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 
 interface TestCenterProps {
@@ -19,9 +17,7 @@ interface TestCenterProps {
 }
 
 const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizzes, assignments, settings, onMockData, onEnterSimulation, addToast }) => {
-  const [isAITesting, setIsAITesting] = useState(false);
-  const [showBoardTest, setShowBoardTest] = useState(false);
-  const [diagnosticResult, setDiagnosticResult] = useState<{status: 'idle' | 'loading' | 'success' | 'error', message: string}>({ status: 'idle', message: '' });
+  const [diagnosticResult, setDiagnosticResult] = useState<{status: 'idle' | 'loading' | 'success' | 'warning' | 'error', message: string}>({ status: 'idle', message: '' });
 
   const generateMockData = () => {
     const mockYears: Year[] = [
@@ -82,23 +78,10 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
     addToast('تم تجهيز المجموعات بنظام البنين والبنات الجديد! 🧪✨', 'success');
   };
 
-  const testAICapability = async () => {
-    setIsAITesting(true);
-    try {
-      await generateQuizFromContent("الهندسة", undefined, settings.mathNotation);
-      addToast('المعلم الذكي جاهز ✅', 'success');
-    } catch (e) {
-      addToast('خطأ في الاتصال ❌', 'error');
-    } finally {
-      setIsAITesting(false);
-    }
-  };
-
   // --- New Diagnostic Function ---
   const runDiagnostics = async () => {
       setDiagnosticResult({ status: 'loading', message: 'جاري فحص الاتصال...' });
       
-      // 1. Check Initialization Error
       const initErr = getFirebaseInitError();
       if (initErr) {
           setDiagnosticResult({ 
@@ -109,19 +92,14 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
       }
 
       if (!db) {
-          setDiagnosticResult({ status: 'error', message: 'كائن قاعدة البيانات (DB Object) غير موجود. التطبيق يعمل في وضع الأوفلاين.' });
+          setDiagnosticResult({ status: 'warning', message: 'كائن قاعدة البيانات غير متصل (null)، جاري العمل محلياً.' });
           return;
       }
 
-      // 2. Try Real Connection
+      // Try Real Connection
       try {
-          // Attempt to read a non-existent collection just to check connectivity/auth
+          // Attempt to read from a collection
           await getDocs(collection(db, '_diagnostics_check_'));
-          
-          // Attempt to write (if rules allow, or fails with permission-denied which means connected)
-          // We expect this to work if rules are open, or fail with 'permission-denied' if connected but restricted.
-          // Either way, it confirms connection to Google servers.
-          
           setDiagnosticResult({ 
               status: 'success', 
               message: 'الاتصال ناجح! ✅\nالتطبيق متصل بسيرفرات Firebase Firestore بشكل سليم.' 
@@ -132,12 +110,13 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
 
           if (error.code === 'permission-denied') {
               errorMsg = "تم الاتصال ولكن تم رفض الصلاحية (Permission Denied).";
-              tip = "تأكد من إعدادات Firestore Rules في الكونسول لتكون:\nallow read, write: if true; (للتجربة)";
+              tip = "تأكد من إعدادات Firestore Rules في الكونسول (اجعلها Test Mode مؤقتاً).";
           } else if (error.code === 'unavailable') {
               errorMsg = "الخدمة غير متاحة (Offline).";
               tip = "تأكد من اتصال الإنترنت.";
-          } else if (errorMsg.includes("project")) {
-              tip = "تأكد من أن projectId في الكود يطابق الموجود في Firebase Console.";
+          } else if (error.message.includes("Service firestore is not available")) {
+              errorMsg = "خدمة قاعدة البيانات غير مفعلة.";
+              tip = "⚠️ هام: يجب عليك الذهاب إلى Firebase Console -> Build -> Firestore Database والضغط على Create Database.";
           }
 
           setDiagnosticResult({ 
@@ -172,10 +151,12 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
       {diagnosticResult.status !== 'idle' && (
           <div className={`p-6 rounded-[2.5rem] border-2 animate-fadeIn ${
               diagnosticResult.status === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
+              diagnosticResult.status === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 
               diagnosticResult.status === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-blue-50 border-blue-200 text-blue-800'
           }`}>
               <h4 className="font-black text-lg mb-2 flex items-center gap-2">
-                  {diagnosticResult.status === 'success' ? '✅ نتيجة الفحص: متصل' : diagnosticResult.status === 'error' ? '❌ نتيجة الفحص: فشل' : '⏳ جاري الفحص...'}
+                  {diagnosticResult.status === 'success' ? '✅ الحالة: متصل / نشط' : 
+                   diagnosticResult.status === 'error' ? '❌ الحالة: خطأ' : '⏳ جاري الفحص...'}
               </h4>
               <pre className="text-xs font-mono font-bold whitespace-pre-wrap bg-white/50 p-4 rounded-xl border border-black/5" dir="ltr">
                   {diagnosticResult.message}
@@ -250,33 +231,10 @@ const TestCenter: React.FC<TestCenterProps> = ({ students, years, groups, quizze
 
          <div className="lg:col-span-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <button onClick={() => setShowBoardTest(true)} className="p-6 bg-white border border-gray-200 rounded-[2.5rem] text-center hover:border-amber-400 transition-all group shadow-sm">
-                  <span className="text-3xl block mb-2 group-hover:scale-110 transition-transform">🖋️</span>
-                  <h4 className="font-black text-slate-800">تجربة السبورة</h4>
-               </button>
-               <button onClick={testAICapability} disabled={isAITesting} className="p-6 bg-white border border-gray-200 rounded-[2.5rem] text-center hover:border-emerald-400 transition-all group shadow-sm">
-                  <span className="text-3xl block mb-2 group-hover:scale-110 transition-transform">🧠</span>
-                  <h4 className="font-black text-slate-800">{isAITesting ? 'جاري الفحص...' : 'فحص محرك الذكاء الاصطناعي'}</h4>
-               </button>
+               {/* Board test removed */}
             </div>
          </div>
       </div>
-
-      {showBoardTest && (
-        <div className="fixed inset-0 z-[500] bg-indigo-950 p-2 flex flex-col animate-fadeIn">
-           <div className="flex justify-between items-center mb-4 px-4 text-white">
-              <h3 className="font-black text-md">فحص السبورة</h3>
-              <button onClick={() => setShowBoardTest(false)} className="w-10 h-10 bg-white/10 hover:bg-rose-600 rounded-xl flex items-center justify-center text-xl shadow-lg">✕</button>
-           </div>
-           <div className="flex-1 bg-white rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white/10">
-              <InteractiveBoard 
-                onSave={() => addToast('تم الحفظ بنجاح ✓', 'success')} 
-                onCancel={() => setShowBoardTest(false)} 
-                notation={settings.mathNotation}
-              />
-           </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -2,8 +2,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage, Student, Year, MathNotation, EducationalSource, PlatformSettings, AppView } from '../types';
 import MathRenderer from '../components/MathRenderer';
-import { solveMathProblem } from '../services/geminiService';
-import InteractiveBoard from '../components/InteractiveBoard';
 
 interface ChatRoomProps {
   user: { id: string; name: string; role: 'teacher' | 'student'; yearId?: string };
@@ -30,13 +28,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
   const [activeTab, setActiveTab] = useState<'group' | 'private'>('group');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   
-  // State for rendering AI drawing
-  const [drawingToRender, setDrawingToRender] = useState<string | null>(null);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -114,54 +108,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
     onSendMessage(textToSend, activeTab, activeTab === 'private' ? (user.role === 'teacher' ? selectedStudentId! : 'teacher') : undefined, audioData);
     setInputText('');
     setAudioBase64(null);
-
-    if (activeTab === 'group' && textToSend.includes('@ذكاء')) {
-      setIsAiLoading(true);
-      try {
-        const question = textToSend.replace('@ذكاء', '').trim();
-        
-        // 1. Get Student Year
-        const studentYearId = user.role === 'student' ? user.yearId : (selectedStudentId ? students.find(s=>s.id===selectedStudentId)?.yearId : undefined);
-        const yearName = years.find(y => y.id === studentYearId)?.name || 'عام';
-
-        // 2. Fetch Grounding References for this Year
-        const references = educationalSources
-            .filter(s => s.isAiReference && (s.yearId === studentYearId || s.yearId === 'all'))
-            .map(s => s.textContent)
-            .join("\n\n");
-
-        // 3. Call AI with Reference
-        let aiResponse = await solveMathProblem(question, undefined, notation as MathNotation, yearName, references);
-        
-        // 4. Parse for Drawing Command
-        if (aiResponse.includes('||DRAWING_JSON||')) {
-            const parts = aiResponse.split('||DRAWING_JSON||');
-            const mainText = parts[0];
-            const drawingPart = parts[1].split('||END_DRAWING||')[0];
-            
-            // Clean response for chat
-            aiResponse = mainText + "\n\n*(تم إنشاء رسم توضيحي، اضغط للمعانية)*";
-            // Append data hiddenly or use a marker
-            aiResponse = mainText + `||DRAWING_DATA||${drawingPart}`;
-        }
-
-        onSendMessage(`🤖 **المعلم المساعد الذكي:** \n\n ${aiResponse}`, 'group', undefined);
-      } catch (e) {
-        console.error(e);
-        onSendMessage("⚠️ عذراً، واجهت مشكلة في التفكير، حاول مرة أخرى!", 'group', undefined);
-      } finally {
-        setIsAiLoading(false);
-      }
-    }
-  };
-
-  // Helper to parse message content for drawing data
-  const parseMessageContent = (content: string) => {
-      if (content.includes('||DRAWING_DATA||')) {
-          const parts = content.split('||DRAWING_DATA||');
-          return { text: parts[0], drawingData: parts[1] };
-      }
-      return { text: content, drawingData: null };
   };
 
   const filteredMessages = messages.filter(m => {
@@ -216,8 +162,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
             {filteredMessages.map((msg) => {
               const isMe = msg.senderId === user.id;
               const isTeacher = msg.senderRole === 'teacher';
-              const isAi = msg.text.includes('🤖');
-              const { text, drawingData } = parseMessageContent(msg.text);
 
               return (
                 <div key={msg.id} className={`flex ${isMe ? 'justify-start' : 'justify-end'} animate-fadeIn`}>
@@ -229,7 +173,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
                     
                     <div className={`relative px-6 py-4 rounded-[2rem] text-sm md:text-md font-bold shadow-sm border ${
                       isMe ? 'bg-blue-600 text-white border-blue-500 rounded-tr-none' : 
-                      isAi ? 'bg-slate-900 text-blue-200 border-slate-800 rounded-tl-none' :
                       isTeacher ? 'bg-white border-blue-100 text-slate-800 rounded-tl-none ring-4 ring-blue-50' : 
                       'bg-white text-slate-800 border-slate-100 rounded-tl-none'
                     }`}>
@@ -240,16 +183,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
                         </div>
                       ) : (
                         <div>
-                            <MathRenderer content={text} inline />
-                            {drawingData && (
-                                <button 
-                                    onClick={() => setDrawingToRender(drawingData)}
-                                    className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg"
-                                >
-                                    <span>مشاهدة الرسم الهندسي</span>
-                                    <span>📐</span>
-                                </button>
-                            )}
+                            <MathRenderer content={msg.text} inline />
                         </div>
                       )}
                       
@@ -261,13 +195,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
                 </div>
               );
             })}
-            {isAiLoading && (
-              <div className="flex justify-center py-4 animate-pulse">
-                 <div className="bg-slate-900 px-6 py-3 rounded-full text-blue-400 text-[10px] font-black shadow-xl">
-                    🤖 المساعد الذكي يراجع المصادر المعتمدة...
-                 </div>
-              </div>
-            )}
           </div>
 
           {user.role === 'teacher' && activeTab === 'private' && selectedStudentId && (
@@ -293,7 +220,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
               
               <input 
                 type="text" 
-                placeholder={isRecording ? "جاري التسجيل..." : (activeTab === 'group' ? "سؤال للمساعد؟ اكتب @ذكاء قبل المسألة" : "اكتب رسالة خاصة للمدرس...")}
+                placeholder={isRecording ? "جاري التسجيل..." : (activeTab === 'group' ? "اكتب رسالة للجميع..." : "اكتب رسالة خاصة للمدرس...")}
                 className="flex-1 px-4 outline-none font-bold text-sm bg-transparent" 
                 value={inputText} 
                 onChange={e => setInputText(e.target.value)} 
@@ -307,27 +234,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, messages, years, students, on
           </div>
         </div>
       </div>
-
-      {/* Programmatic Drawing Modal */}
-      {drawingToRender && (
-          <div className="fixed inset-0 z-[1000] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
-              <div className="bg-white w-full max-w-4xl rounded-[3rem] h-[80vh] shadow-2xl relative overflow-hidden flex flex-col">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                      <h3 className="font-black text-xl text-slate-800">الرسم الهندسي المولد بالذكاء الاصطناعي</h3>
-                      <button onClick={() => setDrawingToRender(null)} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-rose-50 hover:text-rose-500 transition-all border shadow-sm">✕</button>
-                  </div>
-                  <div className="flex-1 relative bg-white">
-                      <InteractiveBoard 
-                         initialData={drawingToRender}
-                         onSave={()=>{}} 
-                         onCancel={() => setDrawingToRender(null)} 
-                         title="AI Generated"
-                         initialBackground="grid"
-                      />
-                  </div>
-              </div>
-          </div>
-      )}
     </div>
   );
 };

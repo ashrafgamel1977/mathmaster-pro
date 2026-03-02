@@ -352,6 +352,16 @@ const App: React.FC = () => {
           if(action==='update') setStudents(prev => prev.map(s => s.id === data.id ? {...s, ...data} : s));
           if(action==='delete') setStudents(prev => prev.filter(s => s.id !== data));
           break;
+        case 'years':
+          if(action==='save') setYears(prev => [...prev, data]);
+          if(action==='update') setYears(prev => prev.map(y => y.id === data.id ? {...y, ...data} : y));
+          if(action==='delete') setYears(prev => prev.filter(y => y.id !== data));
+          break;
+        case 'groups':
+          if(action==='save') setGroups(prev => [...prev, data]);
+          if(action==='update') setGroups(prev => prev.map(g => g.id === data.id ? {...g, ...data} : g));
+          if(action==='delete') setGroups(prev => prev.filter(g => g.id !== data));
+          break;
         case 'assignments':
           if(action==='save') setAssignments(prev => [...prev, data]);
           if(action==='update') setAssignments(prev => prev.map(a => a.id === data.id ? {...a, ...data} : a));
@@ -360,6 +370,56 @@ const App: React.FC = () => {
         case 'quizzes':
           if(action==='save') setQuizzes(prev => [...prev, data]);
           if(action==='delete') setQuizzes(prev => prev.filter(q => q.id !== data));
+          break;
+        case 'submissions':
+          if(action==='save') setSubmissions(prev => [...prev, data]);
+          if(action==='update') setSubmissions(prev => prev.map(s => s.id === data.id ? {...s, ...data} : s));
+          if(action==='delete') setSubmissions(prev => prev.filter(s => s.id !== data));
+          break;
+        case 'results':
+          if(action==='save') setResults(prev => [...prev, data]);
+          if(action==='update') setResults(prev => prev.map(r => r.id === data.id ? {...r, ...data} : r));
+          if(action==='delete') setResults(prev => prev.filter(r => r.id !== data));
+          break;
+        case 'notifications':
+          if(action==='save') setNotifications(prev => [...prev, data]);
+          if(action==='update') setNotifications(prev => prev.map(n => n.id === data.id ? {...n, ...data} : n));
+          if(action==='delete') setNotifications(prev => prev.filter(n => n.id !== data));
+          break;
+        case 'videoLessons':
+          if(action==='save') setVideoLessons(prev => [...prev, data]);
+          if(action==='update') setVideoLessons(prev => prev.map(v => v.id === data.id ? {...v, ...data} : v));
+          if(action==='delete') setVideoLessons(prev => prev.filter(v => v.id !== data));
+          break;
+        case 'educationalSources':
+          if(action==='save') setEducationalSources(prev => [...prev, data]);
+          if(action==='update') setEducationalSources(prev => prev.map(e => e.id === data.id ? {...e, ...data} : e));
+          if(action==='delete') setEducationalSources(prev => prev.filter(e => e.id !== data));
+          break;
+        case 'messages':
+          if(action==='save') setMessages(prev => [...prev, data]);
+          if(action==='update') setMessages(prev => prev.map(m => m.id === data.id ? {...m, ...data} : m));
+          if(action==='delete') setMessages(prev => prev.filter(m => m.id !== data));
+          break;
+        case 'assistants':
+          if(action==='save') setAssistants(prev => [...prev, data]);
+          if(action==='update') setAssistants(prev => prev.map(a => a.id === data.id ? {...a, ...data} : a));
+          if(action==='delete') setAssistants(prev => prev.filter(a => a.id !== data));
+          break;
+        case 'schedules':
+          if(action==='save') setSchedules(prev => [...prev, data]);
+          if(action==='update') setSchedules(prev => prev.map(s => s.id === data.id ? {...s, ...data} : s));
+          if(action==='delete') setSchedules(prev => prev.filter(s => s.id !== data));
+          break;
+        case 'formulas':
+          if(action==='save') setFormulas(prev => [...prev, data]);
+          if(action==='update') setFormulas(prev => prev.map(f => f.id === data.id ? {...f, ...data} : f));
+          if(action==='delete') setFormulas(prev => prev.filter(f => f.id !== data));
+          break;
+        case 'folders':
+          if(action==='save') setFolders(prev => [...prev, data]);
+          if(action==='update') setFolders(prev => prev.map(f => f.id === data.id ? {...f, ...data} : f));
+          if(action==='delete') setFolders(prev => prev.filter(f => f.id !== data));
           break;
         case 'videoViews':
           if(action==='save') setVideoViews(prev => [...prev, data]);

@@ -121,8 +121,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                 <span className="text-slate-200 text-xs font-bold">محتوى محمي</span>
              </div>
              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20">
-                <span className="text-amber-400">🤖</span>
-                <span className="text-slate-200 text-xs font-bold">ذكاء اصطناعي</span>
+                <span className="text-amber-400">📊</span>
+                <span className="text-slate-200 text-xs font-bold">متابعة دقيقة</span>
              </div>
           </div>
         </div>

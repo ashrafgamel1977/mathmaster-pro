@@ -2,9 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Assignment, Student, Year, AssignmentSubmission, AssignmentAttachment, MathNotation } from '../types';
 import AssignmentGrading from '../components/AssignmentGrading';
-import InteractiveBoard from '../components/InteractiveBoard';
 import MathRenderer from '../components/MathRenderer';
-import { analyzeStudentWork } from '../services/geminiService';
 
 interface AssignmentsViewProps {
   assignments: Assignment[];
@@ -25,13 +23,9 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
   const [selectedAsgId, setSelectedAsgId] = useState<string | null>(null);
   const [expandedAsgId, setExpandedAsgId] = useState<string | null>(null);
   const [gradingSub, setGradingSub] = useState<AssignmentSubmission | null>(null);
-  const [activeTab, setActiveTab] = useState<'text' | 'link' | 'file' | 'board'>('board');
-  const [showBoard, setShowBoard] = useState(false);
+  const [activeTab, setActiveTab] = useState<'text' | 'link' | 'file'>('file');
   const [showPreview, setShowPreview] = useState(false);
   
-  const [analyzingSubId, setAnalyzingSubId] = useState<string | null>(null);
-  const [aiGradingData, setAiGradingData] = useState<{ grade: number, feedback: string } | null>(null);
-
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const fileTypeInputRef = useRef<HTMLInputElement>(null);
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -63,7 +57,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     setIsEditing(false);
     setShowAdd(false);
     setShowPreview(false);
-    setActiveTab('board');
+    setActiveTab('file');
   };
 
   const handleSave = () => {
@@ -77,7 +71,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       yearId: newAsg.yearId,
       type: activeTab,
       externalLink: activeTab === 'link' ? newAsg.externalLink : undefined,
-      fileUrl: (activeTab === 'file' || activeTab === 'board') ? newAsg.fileUrl : undefined,
+      fileUrl: activeTab === 'file' ? newAsg.fileUrl : undefined,
       status: newAsg.status,
       submissions: isEditing ? (assignments.find(a => a.id === newAsg.id)?.submissions || 0) : 0,
       attachments: newAsg.attachments
@@ -105,7 +99,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
       attachments: asg.attachments || []
     });
     
-    if (asg.fileUrl) setActiveTab(asg.description.includes('السبورة') ? 'board' : 'file');
+    if (asg.fileUrl) setActiveTab('file');
     else if (asg.externalLink) setActiveTab('link');
     else setActiveTab('text');
 
@@ -175,45 +169,12 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
     }));
   };
 
-  const handleBoardCapture = (dataUrl: string) => {
-    setNewAsg(prev => ({ 
-      ...prev, 
-      fileUrl: dataUrl,
-      desc: prev.desc || 'واجب مرسوم من السبورة'
-    }));
-    setShowBoard(false);
-  };
-
   const isPastDue = (dateString: string) => {
     if (!dateString) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const due = new Date(dateString);
     return due < today;
-  };
-
-  const handleAiAutoGrade = async (sub: AssignmentSubmission) => {
-    if (!sub.fileUrl) {
-      alert("لا يوجد ملف مرفق لتحليله.");
-      return;
-    }
-    setAnalyzingSubId(sub.id);
-    try {
-      const aiResponse = await analyzeStudentWork(
-        { data: sub.fileUrl, mimeType: 'image/jpeg' }, 
-        notation
-      );
-      setAiGradingData({
-        grade: aiResponse.suggestedGrade,
-        feedback: aiResponse.feedback
-      });
-      setGradingSub(sub);
-    } catch (error) {
-      console.error("AI Grading Error:", error);
-      alert("عذراً، حدث خطأ أثناء التحليل الذكي. يرجى المحاولة يدوياً.");
-    } finally {
-      setAnalyzingSubId(null);
-    }
   };
 
   const selectedAsg = assignments.find(a => a.id === selectedAsgId);
@@ -375,31 +336,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                           </div>
                           
                           <div className="flex gap-2 w-full md:w-auto">
-                            {sub.fileUrl && sub.status !== 'graded' && (
-                              <button 
-                                onClick={() => handleAiAutoGrade(sub)}
-                                disabled={analyzingSubId === sub.id}
-                                className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10px] font-black shadow-lg transition-all flex items-center justify-center gap-2 ${
-                                  analyzingSubId === sub.id 
-                                    ? 'bg-amber-100 text-amber-700 cursor-wait' 
-                                    : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:scale-105'
-                                }`}
-                              >
-                                {analyzingSubId === sub.id ? (
-                                  <>
-                                    <span className="w-3 h-3 border-2 border-amber-700/30 border-t-amber-700 rounded-full animate-spin"></span>
-                                    <span>جاري التحليل...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>تصحيح ذكي</span>
-                                    <span>🪄</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
-
-                            <button onClick={() => { setGradingSub(sub); setAiGradingData(null); }} className="flex-1 md:flex-none px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-indigo-100 hover:scale-105 transition-all">
+                            <button onClick={() => { setGradingSub(sub); }} className="flex-1 md:flex-none px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-indigo-100 hover:scale-105 transition-all">
                                {sub.status === 'graded' ? 'مراجعة التصحيح' : 'تصحيح يدوي ✍️'}
                             </button>
                           </div>
@@ -496,9 +433,9 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 px-4 uppercase tracking-widest">نوع المرفق الإضافي (اختياري)</label>
                   <div className="flex bg-gray-100 p-1.5 rounded-[2rem]">
-                    {['board', 'file', 'link', 'text'].map(t => (
+                    {['file', 'link', 'text'].map(t => (
                       <button key={t} onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 rounded-2xl text-[9px] font-black transition-all ${activeTab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                        {t === 'board' ? 'سبورة' : t === 'file' ? 'ملف' : t === 'link' ? 'رابط' : 'بدون'}
+                        {t === 'file' ? 'ملف' : t === 'link' ? 'رابط' : 'بدون'}
                       </button>
                     ))}
                   </div>
@@ -525,20 +462,6 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
                            <p className="font-black text-indigo-600 text-sm">اضغط لرفع ملف الواجب الأساسي (صورة)</p>
                            <input type="file" ref={fileTypeInputRef} className="hidden" accept="image/*" onChange={handleMainFileUpload} />
                          </div>
-                       )}
-                    </div>
-                  )}
-                  {activeTab === 'board' && (
-                    <div className="text-center py-4">
-                       {newAsg.fileUrl ? (
-                          <div className="relative inline-block">
-                             <img src={newAsg.fileUrl} className="max-h-40 rounded-2xl border-4 border-white shadow-xl" alt="Board Capture" />
-                             <button onClick={() => setNewAsg({...newAsg, fileUrl: ''})} className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg">✕</button>
-                          </div>
-                       ) : (
-                         <button onClick={() => setShowBoard(true)} className="px-10 py-5 bg-amber-500 text-white rounded-[2rem] font-black text-sm shadow-xl flex items-center gap-3 mx-auto hover:bg-amber-600 transition-all">
-                           <span>🖋️</span> افتح السبورة لرسم المسألة
-                         </button>
                        )}
                     </div>
                   )}
@@ -575,24 +498,6 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
         </div>
       )}
 
-      {showBoard && (
-        <div className="fixed inset-0 z-[600] bg-indigo-950 p-2 md:p-6 flex flex-col animate-fadeIn">
-           <div className="flex justify-between items-center mb-4 px-8 text-white">
-              <h3 className="font-black text-xl md:text-2xl">سبورة رسم الواجب 🖋️</h3>
-              <button onClick={() => setShowBoard(false)} className="w-12 h-12 bg-white/10 hover:bg-rose-600 rounded-2xl flex items-center justify-center text-2xl transition-all">✕</button>
-           </div>
-           <div className="flex-1 bg-white rounded-[4rem] overflow-hidden shadow-2xl">
-              <InteractiveBoard 
-                onSave={handleBoardCapture} 
-                onCancel={() => setShowBoard(false)} 
-                title="رسم محتوى الواجب" 
-                initialBackground="grid"
-                notation={notation}
-              />
-           </div>
-        </div>
-      )}
-
       {gradingSub && (
         <AssignmentGrading 
           submission={gradingSub}
@@ -601,13 +506,10 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = ({ assignments, submissi
           onGrade={(sid, grade, feedback, correctedImg) => {
             onGrade(sid, grade, feedback, correctedImg);
             setGradingSub(null);
-            setAiGradingData(null);
           }}
           onCancel={() => {
             setGradingSub(null);
-            setAiGradingData(null);
           }}
-          aiParams={aiGradingData} // Pass the AI data to pre-fill fields
         />
       )}
     </div>

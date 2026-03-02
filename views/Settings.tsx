@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PlatformSettings, AppView, Assistant, Student, AssignmentSubmission, ParentInquiry, AppNotification, AppFont, CustomSection, TabFeature } from '../types';
-import { generateThemeConfig } from '../services/geminiService';
+import { PlatformSettings, AppView, Assistant, Student, AssignmentSubmission, ParentInquiry, AppNotification, AppFont, CustomSection, TabFeature, TeacherSpecialization } from '../types';
 
 interface SettingsProps {
   settings: PlatformSettings;
@@ -9,7 +8,6 @@ interface SettingsProps {
   onUpdate: (newSettings: PlatformSettings) => void;
   onAddAssistant: (assistant: Assistant) => void;
   onDeleteAssistant: (id: string) => void;
-  // Data for Dashboards
   students?: Student[];
   submissions?: AssignmentSubmission[];
   inquiries?: ParentInquiry[];
@@ -17,60 +15,91 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
-  settings, assistants, onUpdate, onAddAssistant, onDeleteAssistant,
-  students = [], submissions = [], inquiries = [], notifications = []
+  settings, assistants, onUpdate, onAddAssistant, onDeleteAssistant
 }) => {
-  const [expandedSection, setExpandedSection] = useState<string>('views');
+  const [expandedSection, setExpandedSection] = useState<string>('system');
   const [localSettings, setLocalSettings] = useState<PlatformSettings>(settings);
   const [originalSettings, setOriginalSettings] = useState<PlatformSettings>(settings);
   const [isDirty, setIsDirty] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
   
-  // Custom Section Modal State
+  // Custom Section Modal
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [editingSection, setEditingSection] = useState<CustomSection | null>(null);
   const [sectionForm, setSectionForm] = useState({ title: '', icon: '📄', content: '' });
 
-  // AI Theme State
-  const [themePrompt, setThemePrompt] = useState('');
-  const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
+  // Branches
+  const [newBranch, setNewBranch] = useState('');
 
-  // Assistant State
+  // Assistant
   const [newAssistantName, setNewAssistantName] = useState('');
-  const [newAssistantPermissions, setNewAssistantPermissions] = useState<AppView[]>([AppView.DASHBOARD]);
-  
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const heroInputRef = useRef<HTMLInputElement>(null);
+
+  const SPECIALIZATIONS: {id: TeacherSpecialization, label: string, icon: string}[] = [
+    { id: 'math', label: 'الرياضيات', icon: '📐' },
+    { id: 'physics', label: 'الفيزياء', icon: '⚛️' },
+    { id: 'chemistry', label: 'الكيمياء', icon: '🧪' },
+    { id: 'biology', label: 'الأحياء', icon: '🧬' },
+    { id: 'english', label: 'اللغة الإنجليزية', icon: '🇬🇧' },
+    { id: 'arabic', label: 'اللغة العربية', icon: '🕌' },
+    { id: 'history', label: 'التاريخ', icon: '📜' },
+    { id: 'geography', label: 'الجغرافيا', icon: '🌍' },
+    { id: 'general', label: 'عام / أخرى', icon: '🎓' },
+  ];
 
   const FONTS: {id: AppFont, label: string}[] = [
-    { id: 'Cairo', label: 'Cairo (افتراضي)' },
+    { id: 'Cairo', label: 'Cairo (افتراضي - عربي)' },
     { id: 'Tajawal', label: 'Tajawal (عصري)' },
     { id: 'Almarai', label: 'Almarai (رسمي)' },
     { id: 'El Messiri', label: 'El Messiri (فني)' },
   ];
 
-  // System Views Definition
-  const SYSTEM_VIEWS = [
-    { id: AppView.DASHBOARD, defaultLabel: 'الرئيسية', defaultIcon: '🏠' },
-    { id: AppView.STUDENT_PORTAL, defaultLabel: 'بوابة الطالب (معاينة)', defaultIcon: '🎓' },
-    { id: AppView.STUDENTS, defaultLabel: 'الطلاب', defaultIcon: '👥' },
-    { id: AppView.ASSIGNMENTS, defaultLabel: 'الواجبات', defaultIcon: '📝' },
-    { id: AppView.QUIZZES, defaultLabel: 'الاختبارات', defaultIcon: '⚡' },
-    { id: AppView.FILES, defaultLabel: 'المحتوى', defaultIcon: '📚' },
-    { id: AppView.LIVE_CLASS, defaultLabel: 'بث مباشر', defaultIcon: '🎥' },
-    { id: AppView.CHAT, defaultLabel: 'المحادثات', defaultIcon: '💬' },
-    { id: AppView.NOTIFICATIONS, defaultLabel: 'التنبيهات', defaultIcon: '🔔' },
-    { id: AppView.RESULTS, defaultLabel: 'النتائج', defaultIcon: '📊' },
-    { id: AppView.REWARDS, defaultLabel: 'المتجر', defaultIcon: '🎁' },
-    { id: AppView.SCHEDULE, defaultLabel: 'الجدول', defaultIcon: '📅' },
-    { id: AppView.AI_SOLVER, defaultLabel: 'المحلل الذكي', defaultIcon: '🧠' },
-    { id: AppView.FORMULAS, defaultLabel: 'القوانين', defaultIcon: '📐' },
-    { id: AppView.LEADERBOARD, defaultLabel: 'المتصدرين', defaultIcon: '🏆' },
-    { id: AppView.CALL_CENTER, defaultLabel: 'الاتصالات', defaultIcon: '📞' },
+  // Grouped Views
+  const VIEW_GROUPS = [
+    {
+      id: 'academic',
+      title: 'الإدارة الأكاديمية',
+      items: [
+        { id: AppView.STUDENTS, defaultLabel: 'سجل الطلاب', defaultIcon: '👨‍🎓' },
+        { id: AppView.MANAGEMENT, defaultLabel: 'المجموعات', defaultIcon: '🏫' },
+        { id: AppView.SCHEDULE, defaultLabel: 'الجدول الدراسي', defaultIcon: '📅' },
+      ]
+    },
+    {
+      id: 'content',
+      title: 'المحتوى والاختبارات',
+      items: [
+        { id: AppView.ASSIGNMENTS, defaultLabel: 'الواجبات', defaultIcon: '📝' },
+        { id: AppView.QUIZZES, defaultLabel: 'بنك الاختبارات', defaultIcon: '⚡' },
+        { id: AppView.FILES, defaultLabel: 'المكتبة الرقمية', defaultIcon: '📚' },
+        { id: AppView.FORMULAS, defaultLabel: 'المفاهيم والملخصات', defaultIcon: '🔖' },
+      ]
+    },
+    {
+      id: 'tools',
+      title: 'الأدوات التفاعلية',
+      items: [
+        { id: AppView.LIVE_CLASS, defaultLabel: 'البث المباشر', defaultIcon: '🎥' },
+        { id: AppView.RESULTS, defaultLabel: 'النتائج والتحليل', defaultIcon: '📊' },
+      ]
+    },
+    {
+      id: 'communication',
+      title: 'التواصل والمتابعة',
+      items: [
+        { id: AppView.CHAT, defaultLabel: 'غرف النقاش', defaultIcon: '💬' },
+        { id: AppView.NOTIFICATIONS, defaultLabel: 'التنبيهات', defaultIcon: '🔔' },
+        { id: AppView.LEADERBOARD, defaultLabel: 'لوحة الشرف', defaultIcon: '🏆' },
+      ]
+    },
+    {
+        id: 'student_portal',
+        title: 'واجهة الطالب',
+        items: [
+            { id: AppView.STUDENT_PORTAL, defaultLabel: 'بوابة الطالب (زر المعاينة)', defaultIcon: '🎓' },
+        ]
+    }
   ];
 
-  // Default Internal Tabs Configuration (For initial setup if empty)
   const DEFAULT_TABS_CONFIG: Record<string, TabFeature[]> = {
     [AppView.STUDENT_PORTAL]: [
       { id: 'dashboard', label: 'الرئيسية', enabled: true },
@@ -79,27 +108,8 @@ const Settings: React.FC<SettingsProps> = ({
       { id: 'quizzes', label: 'امتحاناتي', enabled: true },
       { id: 'results', label: 'التقارير', enabled: true }
     ],
-    [AppView.QUIZZES]: [
-        { id: 'ai', label: 'مولد الأسئلة (AI)', enabled: true },
-        { id: 'scanner', label: 'ماسح الورق', enabled: true },
-        { id: 'editor', label: 'المحرر اليدوي', enabled: true },
-        { id: 'external', label: 'روابط خارجية', enabled: true }
-    ],
-    [AppView.FILES]: [
-        { id: 'videos', label: 'فيديوهات', enabled: true },
-        { id: 'docs', label: 'كتب وملازم', enabled: true }
-    ],
-    [AppView.CALL_CENTER]: [
-        { id: 'inquiries', label: 'الطلبات الواردة', enabled: true },
-        { id: 'logs', label: 'سجل المكالمات', enabled: true }
-    ],
-    [AppView.CHAT]: [
-        { id: 'group', label: 'الساحة العامة', enabled: true },
-        { id: 'private', label: 'مراسلة المعلم', enabled: true }
-    ]
   };
 
-  // Sync settings only if not in preview mode to avoid overwriting changes
   useEffect(() => {
     if (!isPreviewMode && !isDirty) {
       setLocalSettings(settings);
@@ -113,91 +123,50 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleBrandingChange = (key: keyof PlatformSettings['branding'], value: any) => {
-    setLocalSettings(prev => ({ 
-      ...prev, 
-      branding: { ...prev.branding, [key]: value } 
-    }));
-    setIsDirty(true);
-  };
-
-  const handleDashboardWidgetChange = (key: keyof PlatformSettings['dashboardWidgets'], value: boolean) => {
-    const currentWidgets = localSettings.dashboardWidgets || { showStats: true, showQuickActions: true, showLeaderboard: true, showTools: true };
-    setLocalSettings(prev => ({ 
-      ...prev, 
-      dashboardWidgets: { ...currentWidgets, [key]: value } 
-    }));
+    setLocalSettings(prev => ({ ...prev, branding: { ...prev.branding, [key]: value } }));
     setIsDirty(true);
   };
 
   const handleContentChange = (key: keyof PlatformSettings['contentTexts'], value: any) => {
-    setLocalSettings(prev => ({ 
-      ...prev, 
-      contentTexts: { ...prev.contentTexts, [key]: value } 
-    }));
+    setLocalSettings(prev => ({ ...prev, contentTexts: { ...prev.contentTexts, [key]: value } }));
     setIsDirty(true);
   };
 
-  // View Management Handlers
   const toggleViewEnabled = (viewId: string) => {
     const currentEnabled = localSettings.enabledViews || Object.values(AppView);
-    let newEnabled;
-    if (currentEnabled.includes(viewId)) {
-      newEnabled = currentEnabled.filter(v => v !== viewId);
-    } else {
-      newEnabled = [...currentEnabled, viewId];
-    }
+    const newEnabled = currentEnabled.includes(viewId) 
+      ? currentEnabled.filter(v => v !== viewId) 
+      : [...currentEnabled, viewId];
     handleChange('enabledViews', newEnabled);
   };
 
   const updateViewLabel = (viewId: string, label: string) => {
-    const currentLabels = localSettings.viewLabels || {};
-    const newLabels = { ...currentLabels, [viewId]: label };
-    handleChange('viewLabels', newLabels);
+    handleChange('viewLabels', { ...localSettings.viewLabels, [viewId]: label });
   };
 
-  const updateViewIcon = (viewId: string, icon: string) => {
-    const currentIcons = localSettings.viewIcons || {};
-    const newIcons = { ...currentIcons, [viewId]: icon };
-    handleChange('viewIcons', newIcons);
+  const handleAddBranch = () => {
+    if(!newBranch.trim()) return;
+    const currentBranches = localSettings.branches || [];
+    if(!currentBranches.includes(newBranch)) {
+        handleChange('branches', [...currentBranches, newBranch]);
+    }
+    setNewBranch('');
   };
 
-  // Tab Management Handlers
-  const getTabsForView = (viewId: string) => {
-    const currentConfig = localSettings.featureConfig || {};
-    return currentConfig[viewId] || DEFAULT_TABS_CONFIG[viewId] || [];
+  const removeBranch = (branch: string) => {
+    const currentBranches = localSettings.branches || [];
+    handleChange('branches', currentBranches.filter(b => b !== branch));
   };
 
-  const updateTabConfig = (viewId: string, tabId: string, updates: Partial<TabFeature>) => {
-    const currentConfig = localSettings.featureConfig || {};
-    const viewTabs = currentConfig[viewId] || DEFAULT_TABS_CONFIG[viewId] || [];
-    
-    // Check if viewConfig exists, if not initialize it with default
-    const existingTabs = viewTabs.length > 0 ? viewTabs : (DEFAULT_TABS_CONFIG[viewId] || []);
-    
-    const newViewTabs = existingTabs.map(t => t.id === tabId ? { ...t, ...updates } : t);
-    
-    const newConfig = { ...currentConfig, [viewId]: newViewTabs };
-    handleChange('featureConfig', newConfig);
-  };
-
-  // Custom Section Handlers
   const handleSaveSection = () => {
     if (!sectionForm.title) return;
-    
     const currentSections = localSettings.customSections || [];
     let newSections;
-
     if (editingSection) {
       newSections = currentSections.map(s => s.id === editingSection.id ? { ...s, ...sectionForm } : s);
     } else {
-      const newSec: CustomSection = {
-        id: `custom_${Date.now()}`,
-        ...sectionForm,
-        isVisibleToStudents: true
-      };
-      newSections = [...currentSections, newSec];
+      newSections = [...currentSections, { id: `custom_${Date.now()}`, ...sectionForm, isVisibleToStudents: true }];
     }
-
     handleChange('customSections', newSections);
     setShowSectionModal(false);
     setSectionForm({ title: '', icon: '📄', content: '' });
@@ -205,25 +174,8 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleDeleteSection = (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا القسم؟')) return;
-    const currentSections = localSettings.customSections || [];
-    handleChange('customSections', currentSections.filter(s => s.id !== id));
-  };
-
-  const handleEditSection = (section: CustomSection) => {
-    setEditingSection(section);
-    setSectionForm({ title: section.title, icon: section.icon, content: section.content });
-    setShowSectionModal(true);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, key: 'logoUrl' | 'heroImageUrl') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        handleBrandingChange(key, ev.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (window.confirm('حذف هذا القسم؟')) {
+        handleChange('customSections', (localSettings.customSections || []).filter(s => s.id !== id));
     }
   };
 
@@ -234,507 +186,346 @@ const Settings: React.FC<SettingsProps> = ({
     setOriginalSettings(localSettings);
   };
 
-  const handleRevert = () => {
-    setLocalSettings(originalSettings);
-    setIsDirty(false);
-    setIsPreviewMode(false);
-  };
-
-  const handleAiThemeGeneration = async (prompt?: string) => {
-    const text = prompt || themePrompt;
-    if (!text) return;
-
-    setIsGeneratingTheme(true);
-    try {
-      const themeConfig = await generateThemeConfig(text);
-      if (themeConfig) {
-        setLocalSettings(prev => ({
-          ...prev,
-          branding: {
-            ...prev.branding,
-            primaryColor: themeConfig.primaryColor || prev.branding.primaryColor,
-            secondaryColor: themeConfig.secondaryColor || prev.branding.secondaryColor,
-            fontFamily: themeConfig.fontFamily || prev.branding.fontFamily,
-          }
-        }));
-        setIsPreviewMode(true);
-        setIsDirty(true);
-      }
-    } catch (e) {
-      alert("عذراً، حدث خطأ أثناء توليد الثيم. يرجى المحاولة مرة أخرى.");
-    } finally {
-      setIsGeneratingTheme(false);
-    }
-  };
-
   const handleAddAssistant = () => {
-    if (!newAssistantName.trim()) return;
-    const finalPermissions = Array.from(new Set([...newAssistantPermissions, AppView.DASHBOARD]));
-    const assistant: Assistant = {
-      id: 'asst_' + Date.now(),
-      name: newAssistantName,
-      code: Math.floor(1000 + Math.random() * 9000).toString(),
-      permissions: finalPermissions,
-      addedAt: new Date().toLocaleDateString('ar-EG')
-    };
-    onAddAssistant(assistant);
-    setNewAssistantName('');
-    setNewAssistantPermissions([AppView.DASHBOARD]);
-    alert('تم إضافة المساعد بنجاح! \n كود الدخول: ' + assistant.code);
+      if (!newAssistantName) return;
+      onAddAssistant({
+          id: 'asst_'+Date.now(),
+          name: newAssistantName,
+          code: Math.floor(1000 + Math.random() * 9000).toString(),
+          permissions: [AppView.DASHBOARD],
+          addedAt: new Date().toLocaleDateString('ar-EG')
+      });
+      setNewAssistantName('');
   };
 
-  const sections = [
-    { id: 'views', label: 'القوائم والأقسام', icon: '🍱', desc: 'إضافة وحذف وتعديل القوائم الرئيسية' },
-    { id: 'tabs', label: 'تخصيص التبويبات الداخلية', icon: '📑', desc: 'التحكم في الأزرار والتبويبات داخل كل شاشة' },
-    { id: 'branding', label: 'المظهر والهوية', icon: '🎨', desc: 'تخصيص الألوان، الخطوط، والشعارات' },
-    { id: 'dashboard_config', label: 'تخطيط لوحة التحكم', icon: '📐', desc: 'إظهار وإخفاء أدوات الشاشة الرئيسية' },
-    { id: 'content', label: 'نصوص المحتوى', icon: '📝', desc: 'عناوين ورسائل الترحيب' },
-    { id: 'system', label: 'إعدادات النظام والميزات', icon: '⚙️', desc: 'الخصائص، التلقائية، ونمط الرياضيات' },
-    { id: 'security', label: 'الأمان وضبط الأجهزة', icon: '🛡️', desc: 'حماية المحتوى وإدارة الوصول' },
-    { id: 'assistants', label: 'إدارة الطاقم', icon: '🛠️', desc: 'إضافة مساعدين وصلاحياتهم' },
+  const SECTIONS = [
+    { id: 'system', label: 'التخصص والنظام', icon: '⚙️', desc: 'تحديد مادة المعلم والفروع' },
+    { id: 'views', label: 'القوائم والأقسام', icon: '🏗️', desc: 'تفعيل وإخفاء أدوات المنصة' },
+    { id: 'branding', label: 'الهوية والمظهر', icon: '🎨', desc: 'الألوان، الشعار، والخطوط' },
+    { id: 'content', label: 'نصوص الواجهة', icon: '✍️', desc: 'رسائل الترحيب والعناوين' },
+    { id: 'security', label: 'الأمان والمساعدين', icon: '🛡️', desc: 'كلمات المرور وإدارة الطاقم' },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-slideUp pb-40 text-right" dir="rtl">
+    <div className="max-w-6xl mx-auto space-y-8 animate-slideUp pb-40 text-right font-['Cairo']" dir="rtl">
       
-      {/* Page Header */}
-      <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 mb-8">
-         <h2 className="text-3xl font-black text-slate-800">لوحة التحكم والإعدادات ⚙️</h2>
-         <p className="text-slate-400 font-bold mt-2">تحكم في كل تفاصيل منصتك من مكان واحد.</p>
+      {/* Header */}
+      <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
+         <div>
+            <h2 className="text-3xl font-black text-slate-800">إعدادات المنصة 🛠️</h2>
+            <p className="text-slate-400 font-bold mt-2">تحكم كامل في خصائص ومظهر تطبيقك التعليمي.</p>
+         </div>
+         {(isDirty || isPreviewMode) && (
+             <div className="flex gap-3 animate-bounce">
+                 <button onClick={() => { setLocalSettings(originalSettings); setIsDirty(false); setIsPreviewMode(false); }} className="px-6 py-3 bg-slate-100 text-slate-500 rounded-2xl font-bold text-xs">تراجع ↩</button>
+                 <button onClick={handleSave} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs shadow-lg">حفظ التغييرات ✓</button>
+             </div>
+         )}
       </div>
 
-      {/* Floating Preview/Save Bar */}
-      {(isPreviewMode || isDirty) && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-bounce w-[90%] max-w-lg">
-          <div className="bg-slate-900/90 backdrop-blur-md text-white p-4 rounded-[2.5rem] shadow-2xl flex items-center justify-between gap-4 border border-white/10">
-             <div className="flex items-center gap-3 px-2">
-                <span className="text-2xl">✨</span>
-                <div>
-                   <p className="font-black text-sm">تم تطبيق التغييرات</p>
-                   <p className="text-[10px] text-slate-300 font-medium">هل تريد حفظ التعديلات؟</p>
-                </div>
-             </div>
-             <div className="flex gap-2">
-                <button onClick={handleRevert} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-xs transition-all">تراجع ↩</button>
-                <button onClick={handleSave} className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-black text-xs shadow-lg transition-all">حفظ ✓</button>
-             </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Navigation Sidebar */}
+          <div className="lg:col-span-1 space-y-3">
+              {SECTIONS.map(sec => (
+                  <button
+                    key={sec.id}
+                    onClick={() => setExpandedSection(sec.id)}
+                    className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all text-right ${expandedSection === sec.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                  >
+                      <span className="text-2xl">{sec.icon}</span>
+                      <div>
+                          <p className="font-black text-xs">{sec.label}</p>
+                          <p className={`text-[9px] mt-0.5 ${expandedSection === sec.id ? 'text-indigo-200' : 'text-slate-400'}`}>{sec.desc}</p>
+                      </div>
+                  </button>
+              ))}
           </div>
-        </div>
-      )}
 
-      <div className="space-y-6">
-        {sections.map(section => (
-          <div key={section.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden transition-all duration-300">
-             <button 
-               onClick={() => setExpandedSection(expandedSection === section.id ? '' : section.id)}
-               className={`w-full p-8 flex items-center justify-between transition-colors ${expandedSection === section.id ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'}`}
-             >
-                <div className="flex items-center gap-6">
-                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${expandedSection === section.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                      {section.icon}
-                   </div>
-                   <div className="text-right">
-                      <h3 className="text-xl font-black text-slate-800">{section.label}</h3>
-                      <p className="text-xs text-slate-400 font-bold mt-1">{section.desc}</p>
-                   </div>
-                </div>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 ${expandedSection === section.id ? 'bg-slate-200 rotate-180' : 'bg-slate-50'}`}>
-                   ▼
-                </div>
-             </button>
-
-             {expandedSection === section.id && (
-               <div className="p-8 border-t border-slate-100 animate-fadeIn">
-                  
-                  {/* Views & Menu Editor Section */}
-                  {section.id === 'views' && (
-                    <div className="space-y-8">
-                       <div className="flex justify-between items-center mb-4">
-                          <h4 className="font-black text-slate-800 text-lg">هيكلة التطبيق والقوائم</h4>
-                          <button 
-                            onClick={() => { setEditingSection(null); setSectionForm({title: '', icon: '📄', content: ''}); setShowSectionModal(true); }}
-                            className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all"
-                          >
-                            إضافة قسم جديد ＋
-                          </button>
-                       </div>
-
-                       <div className="space-y-4">
-                          {/* System Views List */}
-                          {SYSTEM_VIEWS.map((view) => {
-                            const isEnabled = (localSettings.enabledViews || Object.values(AppView)).includes(view.id);
-                            const currentLabel = localSettings.viewLabels?.[view.id] || view.defaultLabel;
-                            const currentIcon = localSettings.viewIcons?.[view.id] || view.defaultIcon;
-
-                            return (
-                              <div key={view.id} className={`p-4 rounded-[2rem] border transition-all flex flex-col md:flex-row items-center gap-4 ${isEnabled ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                 <div className="flex items-center gap-4 w-full md:w-auto flex-1">
-                                    {/* Icon Input */}
-                                    <div className="relative group">
-                                       <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-xl cursor-pointer">
-                                          {currentIcon}
-                                       </div>
-                                       <input 
-                                         type="text" 
-                                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                         value={currentIcon}
-                                         onChange={(e) => updateViewIcon(view.id, e.target.value)}
-                                         disabled={!isEnabled}
-                                         title="اكتب رمز تعبيري (Emoji) جديد"
-                                       />
-                                    </div>
-                                    
-                                    {/* Label Input */}
-                                    <div className="flex-1">
-                                       <input 
-                                         type="text" 
-                                         className={`font-bold text-sm bg-transparent outline-none w-full border-b border-transparent focus:border-indigo-500 pb-1 ${isEnabled ? 'text-slate-800' : 'text-slate-400'}`}
-                                         value={currentLabel}
-                                         onChange={(e) => updateViewLabel(view.id, e.target.value)}
-                                         disabled={!isEnabled}
-                                         placeholder={view.defaultLabel}
-                                       />
-                                       <p className="text-[9px] text-slate-400 font-bold mt-1">القسم الأساسي: {view.defaultLabel}</p>
-                                    </div>
-                                 </div>
-
-                                 {/* Toggle Button */}
-                                 <button 
-                                   onClick={() => toggleViewEnabled(view.id)}
-                                   className={`px-6 py-2.5 rounded-xl font-black text-xs transition-all flex items-center gap-2 min-w-[120px] justify-center ${isEnabled ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-200 text-slate-500'}`}
-                                 >
-                                   <div className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
-                                   {isEnabled ? 'مفعل' : 'معطل'}
-                                 </button>
-                              </div>
-                            );
-                          })}
-
-                          {/* Custom Sections List */}
-                          {(localSettings.customSections || []).map((section) => (
-                             <div key={section.id} className="p-4 rounded-[2rem] border border-indigo-100 bg-indigo-50/30 flex flex-col md:flex-row items-center gap-4 relative group">
-                                <div className="flex items-center gap-4 w-full md:w-auto flex-1">
-                                   <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl shadow-sm text-indigo-600">
-                                      {section.icon}
-                                   </div>
-                                   <div className="flex-1">
-                                      <h4 className="font-bold text-sm text-slate-800">{section.title}</h4>
-                                      <p className="text-[9px] text-indigo-400 font-bold mt-1">قسم مخصص</p>
-                                   </div>
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                   <button 
-                                     onClick={() => handleEditSection(section)}
-                                     className="px-4 py-2 bg-white text-indigo-600 rounded-xl text-xs font-bold shadow-sm hover:bg-indigo-50 border border-indigo-100"
-                                   >
-                                     تعديل ✎
-                                   </button>
-                                   <button 
-                                     onClick={() => handleDeleteSection(section.id)}
-                                     className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-bold shadow-sm hover:bg-rose-50 border border-rose-100"
-                                   >
-                                     حذف 🗑️
-                                   </button>
-                                </div>
+          {/* Content Area */}
+          <div className="lg:col-span-3">
+              {expandedSection === 'system' && (
+                  <div className="space-y-8 animate-fadeIn">
+                      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm space-y-6">
+                          <h4 className="font-black text-slate-800 text-sm border-b border-slate-50 pb-2">تخصص المعلم</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                             {SPECIALIZATIONS.map(spec => (
+                                <button
+                                   key={spec.id}
+                                   onClick={() => handleChange('teacherSpecialization', spec.id)}
+                                   className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${localSettings.teacherSpecialization === spec.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200'}`}
+                                >
+                                   <span className="text-2xl">{spec.icon}</span>
+                                   <span className="font-bold text-xs">{spec.label}</span>
+                                </button>
+                             ))}
+                          </div>
+                          
+                          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mt-4">
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">فروع المادة (أقسام المكتبة والامتحانات)</label>
+                             <div className="flex gap-2 mb-4">
+                                <input 
+                                  type="text" 
+                                  placeholder="أضف فرعاً (مثال: النحو، الكهربية، الحديثة...)" 
+                                  className="flex-1 p-3 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-500"
+                                  value={newBranch}
+                                  onChange={e => setNewBranch(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && handleAddBranch()}
+                                />
+                                <button onClick={handleAddBranch} className="px-6 bg-indigo-600 text-white rounded-xl font-black text-xl">＋</button>
                              </div>
-                          ))}
-                       </div>
-                    </div>
-                  )}
-
-                  {/* Tabs Control Section (New) */}
-                  {section.id === 'tabs' && (
-                    <div className="space-y-8">
-                       <p className="text-slate-500 text-xs font-bold bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                          هنا يمكنك إعادة تسمية أو إخفاء التبويبات الداخلية لكل شاشة (مثل: تبويب "فيديوهات" داخل المكتبة، أو "واجباتي" داخل بوابة الطالب).
-                       </p>
-                       
-                       {[
-                         { vid: AppView.STUDENT_PORTAL, label: 'بوابة الطالب 🎓' },
-                         { vid: AppView.QUIZZES, label: 'قسم الاختبارات ⚡' },
-                         { vid: AppView.FILES, label: 'قسم المحتوى والمكتبة 📚' },
-                         { vid: AppView.CALL_CENTER, label: 'قسم الاتصالات 📞' },
-                         { vid: AppView.CHAT, label: 'قسم المحادثات 💬' }
-                       ].map((sectionItem) => (
-                         <div key={sectionItem.vid} className="space-y-4">
-                            <h4 className="font-black text-slate-800 text-md px-2 border-r-4 border-indigo-600 mr-2">{sectionItem.label}</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               {getTabsForView(sectionItem.vid).map((tab) => (
-                                 <div key={tab.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-all">
-                                    <div className="flex-1 space-y-1">
-                                       <label className="text-[9px] font-black text-slate-400 block">اسم التبويب</label>
-                                       <input 
-                                         type="text" 
-                                         className="w-full bg-transparent border-b border-slate-200 font-bold text-sm text-slate-800 outline-none focus:border-indigo-500 transition-all"
-                                         value={tab.label}
-                                         onChange={(e) => updateTabConfig(sectionItem.vid, tab.id, { label: e.target.value })}
-                                       />
-                                    </div>
-                                    <button 
-                                       onClick={() => updateTabConfig(sectionItem.vid, tab.id, { enabled: !tab.enabled })}
-                                       className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${tab.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
-                                    >
-                                       {tab.enabled ? 'ظاهر' : 'مخفي'}
-                                    </button>
-                                 </div>
-                               ))}
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-                  )}
-
-                  {/* Branding Section */}
-                  {section.id === 'branding' && (
-                    <div className="space-y-12">
-                        {/* AI Theme Designer */}
-                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-8 rounded-[3rem] text-white relative overflow-hidden">
-                           {/* ... (Existing AI Theme UI) ... */}
-                           <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                           <div className="relative z-10 space-y-6">
-                              <h4 className="text-2xl font-black flex items-center gap-3">
-                                 <span>✨</span> ستوديو التصميم الذكي
-                              </h4>
-                              <p className="text-slate-300 text-sm font-medium">
-                                 صف المظهر الذي تتخيله (مثلاً: "غروب الشمس الدافئ"، "تكنولوجي أزرق") وسيقوم الذكاء الاصطناعي بتصميمه فوراً.
-                              </p>
-                              
-                              <div className="flex gap-4">
-                                 <input 
-                                   type="text" 
-                                   placeholder="اكتب وصف الثيم هنا..." 
-                                   className="flex-1 px-6 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder:text-slate-400 font-bold outline-none focus:bg-white/20 transition-all"
-                                   value={themePrompt}
-                                   onChange={e => setThemePrompt(e.target.value)}
-                                   onKeyDown={e => e.key === 'Enter' && handleAiThemeGeneration()}
-                                 />
-                                 <button 
-                                   onClick={() => handleAiThemeGeneration()}
-                                   disabled={isGeneratingTheme || !themePrompt}
-                                   className="px-8 py-4 bg-white text-indigo-900 rounded-2xl font-black text-sm shadow-xl hover:scale-105 transition-all disabled:opacity-50"
-                                 >
-                                   {isGeneratingTheme ? 'جاري التصميم...' : 'تنفيذ 🎨'}
-                                 </button>
-                              </div>
-                           </div>
-                        </div>
-
-                        {/* Manual Controls */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                           <div className="space-y-6">
-                              <h4 className="font-black text-slate-800 text-lg">التخصيص اليدوي</h4>
-                              <div className="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                 <div className="flex gap-6 items-center">
-                                    <div className="flex flex-col gap-2 items-center">
-                                       <input type="color" className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-lg" value={localSettings.branding.primaryColor} onChange={e => handleBrandingChange('primaryColor', e.target.value)} />
-                                       <span className="text-[10px] font-black text-slate-500">اللون الرئيسي</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2 items-center">
-                                       <input type="color" className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-lg" value={localSettings.branding.secondaryColor} onChange={e => handleBrandingChange('secondaryColor', e.target.value)} />
-                                       <span className="text-[10px] font-black text-slate-500">اللون الثانوي</span>
-                                    </div>
-                                 </div>
-                                 
-                                 <div className="pt-4 border-t border-slate-200">
-                                    <label className="text-[10px] font-black text-slate-500 block mb-2">نوع الخط</label>
-                                    <select 
-                                       className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-bold outline-none"
-                                       value={localSettings.branding.fontFamily || 'Cairo'}
-                                       onChange={(e) => handleBrandingChange('fontFamily', e.target.value)}
-                                    >
-                                       {FONTS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                                    </select>
-                                 </div>
-                              </div>
-                           </div>
-
-                           <div className="space-y-6">
-                              <h4 className="font-black text-slate-800 text-lg">الصور والشعارات</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                 <div className="p-4 bg-slate-50 rounded-3xl text-center border border-slate-100 hover:bg-slate-100 transition-all cursor-pointer group" onClick={() => logoInputRef.current?.click()}>
-                                    {localSettings.branding.logoUrl ? (
-                                      <img src={localSettings.branding.logoUrl} className="w-20 h-20 mx-auto object-contain rounded-xl" alt="Logo" />
-                                    ) : (
-                                      <div className="w-20 h-20 bg-white rounded-xl mx-auto flex items-center justify-center text-2xl shadow-sm">🖼️</div>
-                                    )}
-                                    <p className="text-[9px] font-black text-slate-400 mt-2">شعار المنصة</p>
-                                    <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
-                                 </div>
-
-                                 <div className="p-4 bg-slate-50 rounded-3xl text-center border border-slate-100 hover:bg-slate-100 transition-all cursor-pointer group" onClick={() => heroInputRef.current?.click()}>
-                                    {localSettings.branding.heroImageUrl ? (
-                                      <img src={localSettings.branding.heroImageUrl} className="w-20 h-20 mx-auto object-cover rounded-xl" alt="Hero" />
-                                    ) : (
-                                      <div className="w-20 h-20 bg-white rounded-xl mx-auto flex items-center justify-center text-2xl shadow-sm">📸</div>
-                                    )}
-                                    <p className="text-[9px] font-black text-slate-400 mt-2">صورة المعلم</p>
-                                    <input type="file" ref={heroInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'heroImageUrl')} />
-                                 </div>
-                              </div>
-                           </div>
-                       </div>
-                    </div>
-                  )}
-
-                  {/* Dashboard Config Section */}
-                  {section.id === 'dashboard_config' && (
-                     <div className="space-y-6">
-                        <h4 className="font-black text-slate-800 text-lg">تحكم في محتويات الصفحة الرئيسية</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer" onClick={() => handleDashboardWidgetChange('showStats', !localSettings.dashboardWidgets?.showStats)}>
-                              <span className="font-bold text-slate-700">بطاقات الإحصائيات العلوية</span>
-                              <div className={`w-10 h-6 rounded-full relative transition-all ${localSettings.dashboardWidgets?.showStats ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${localSettings.dashboardWidgets?.showStats ? 'left-1' : 'left-5'}`}></div>
-                              </div>
-                           </div>
-                           {/* ... other widgets ... */}
-                           <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer" onClick={() => handleDashboardWidgetChange('showQuickActions', !localSettings.dashboardWidgets?.showQuickActions)}>
-                              <span className="font-bold text-slate-700">أزرار الوصول السريع</span>
-                              <div className={`w-10 h-6 rounded-full relative transition-all ${localSettings.dashboardWidgets?.showQuickActions ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${localSettings.dashboardWidgets?.showQuickActions ? 'left-1' : 'left-5'}`}></div>
-                              </div>
-                           </div>
-                           {/* Add Leaderboard/Tools toggle same pattern */}
-                        </div>
-                     </div>
-                  )}
-
-                  {/* Content Section */}
-                  {section.id === 'content' && (
-                    <div className="space-y-8">
-                        <div className="space-y-4">
-                           <h4 className="font-black text-slate-800 text-sm bg-blue-50 p-2 rounded-lg inline-block px-4">الصفحة الرئيسية (Landing Page)</h4>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="space-y-2">
-                                 <label className="text-[10px] font-black text-slate-400">العنوان الرئيسي</label>
-                                 <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-blue-500 outline-none" value={localSettings.contentTexts.landingTitle} onChange={e => handleContentChange('landingTitle', e.target.value)} />
-                              </div>
-                              <div className="space-y-2">
-                                 <label className="text-[10px] font-black text-slate-400">العنوان الفرعي</label>
-                                 <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-blue-500 outline-none" value={localSettings.contentTexts.landingSubtitle} onChange={e => handleContentChange('landingSubtitle', e.target.value)} />
-                              </div>
-                           </div>
-                        </div>
-                        {/* ... other content sections ... */}
-                    </div>
-                  )}
-
-                  {/* System Settings */}
-                  {section.id === 'system' && (
-                    <div className="space-y-8">
-                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                          <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 space-y-4">
-                             <h4 className="font-black text-slate-800 flex items-center gap-2">
-                                <span>🧮</span>
-                                <span>نمط الرياضيات</span>
-                             </h4>
-                             <div className="flex bg-white p-1 rounded-2xl border border-slate-200">
-                                <button onClick={() => handleChange('mathNotation', 'arabic')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${localSettings.mathNotation === 'arabic' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>عربي (س، ص)</button>
-                                <button onClick={() => handleChange('mathNotation', 'english')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${localSettings.mathNotation === 'english' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>English (x, y)</button>
+                             <div className="flex flex-wrap gap-2">
+                                {localSettings.branches?.map(branch => (
+                                   <div key={branch} className="px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-700 animate-fadeIn">
+                                      {branch}
+                                      <button onClick={() => removeBranch(branch)} className="text-rose-400 hover:text-rose-600 text-lg leading-none">×</button>
+                                   </div>
+                                ))}
+                                {(!localSettings.branches || localSettings.branches.length === 0) && <p className="text-xs text-slate-400 font-medium">لم يتم إضافة فروع بعد.</p>}
                              </div>
                           </div>
-                          {/* ... other system settings ... */}
-                       </div>
-                    </div>
-                  )}
+                      </div>
 
-                  {/* Security Section */}
-                  {section.id === 'security' && (
-                    <div className="space-y-8">
-                        <div className="bg-slate-900 p-8 rounded-[3rem] text-white flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">🔑</div>
-                                <div>
-                                  <h4 className="font-black text-lg">كود دخول المعلم</h4>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase">المفتاح الرئيسي</p>
-                               </div>
-                            </div>
-                            <input 
-                              type="text" 
-                              className="w-full md:w-64 px-8 py-4 bg-white/5 border border-white/10 rounded-2xl font-black text-2xl text-center tracking-[0.5em] outline-none focus:border-blue-500 transition-all" 
-                              value={localSettings.adminCode} 
-                              onChange={e => handleChange('adminCode', e.target.value)} 
-                            />
-                        </div>
-                        {/* ... other security settings ... */}
-                    </div>
-                  )}
-
-                  {/* Assistants Section */}
-                  {section.id === 'assistants' && (
-                    <div className="space-y-10">
-                        <div className="bg-indigo-50/50 border-2 border-indigo-100 p-8 rounded-[3rem] space-y-6">
-                            <div className="space-y-4">
-                              <label className="text-[10px] font-black text-indigo-400 uppercase px-2">إضافة مساعد جديد</label>
-                              <div className="flex flex-col md:flex-row gap-4">
-                                <input type="text" placeholder="اسم المساعد" className="flex-1 px-8 py-5 bg-white rounded-2xl font-black outline-none shadow-sm focus:ring-2 focus:ring-indigo-500 transition-all" value={newAssistantName} onChange={e => setNewAssistantName(e.target.value)} />
-                                <button onClick={handleAddAssistant} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:scale-105 transition-all">إضافة ＋</button>
+                      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm space-y-6">
+                          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                              <div>
+                                  <h4 className="font-black text-slate-800 text-sm">نظام الاشتراكات والدفع</h4>
+                                  <p className="text-[10px] text-slate-500 mt-1">عند التفعيل، سيتم إغلاق المحتوى أمام الطلاب غير المسددين.</p>
                               </div>
-                            </div>
-                            {/* ... permissions UI ... */}
-                        </div>
-                        {/* ... assistants list ... */}
-                    </div>
-                  )}
+                              <button 
+                                  onClick={() => handleChange('subscriptionEnabled', !localSettings.subscriptionEnabled)}
+                                  className={`w-14 h-8 rounded-full relative transition-all ${localSettings.subscriptionEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                              >
+                                  <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${localSettings.subscriptionEnabled ? 'left-1' : 'left-7'}`}></div>
+                              </button>
+                          </div>
 
-               </div>
-             )}
+                          {localSettings.subscriptionEnabled && (
+                              <div className="animate-fadeIn">
+                                  <label className="text-[10px] font-black text-slate-400 block mb-2">تعليمات الدفع (تظهر في شاشة القفل)</label>
+                                  <textarea 
+                                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:border-indigo-500 min-h-[100px]"
+                                      value={localSettings.paymentInstructions}
+                                      onChange={e => handleChange('paymentInstructions', e.target.value)}
+                                      placeholder="مثال: يرجى تحويل مبلغ الاشتراك على فودافون كاش..."
+                                  />
+                              </div>
+                          )}
+                          
+                          <div className="p-4 bg-slate-50 rounded-2xl">
+                              <h4 className="font-black text-slate-800 text-sm mb-2">عدد الأجهزة المسموح به</h4>
+                              <p className="text-[10px] text-slate-500 mb-3">الحد الأقصى للأجهزة التي يمكن للطالب استخدامها في نفس الوقت.</p>
+                              <div className="flex items-center gap-4">
+                                <input 
+                                  type="number" 
+                                  min="1" 
+                                  max="5"
+                                  className="w-20 p-3 bg-white border border-slate-200 rounded-xl text-center font-black"
+                                  value={localSettings.maxDevicesPerStudent || 2}
+                                  onChange={e => handleChange('maxDevicesPerStudent', parseInt(e.target.value))}
+                                />
+                                <span className="text-xs font-bold text-slate-600">أجهزة لكل طالب</span>
+                              </div>
+                          </div>
+                      </div>
+
+                      {localSettings.teacherSpecialization === 'math' && (
+                          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                              <h4 className="font-black text-slate-800 mb-4">نمط الرموز الرياضية</h4>
+                              <div className="flex bg-slate-50 p-1 rounded-2xl">
+                                  <button 
+                                      onClick={() => handleChange('mathNotation', 'arabic')}
+                                      className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${localSettings.mathNotation === 'arabic' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}
+                                  >
+                                      عربي (س، ص، جا، جتا)
+                                  </button>
+                                  <button 
+                                      onClick={() => handleChange('mathNotation', 'english')}
+                                      className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${localSettings.mathNotation === 'english' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}
+                                  >
+                                      English (x, y, sin, cos)
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {expandedSection === 'views' && (
+                  <div className="space-y-8 animate-fadeIn">
+                      <div className="flex justify-between items-center">
+                          <h3 className="text-xl font-black text-slate-800">هيكلة القوائم</h3>
+                          <button onClick={() => { setEditingSection(null); setSectionForm({title:'', icon:'📄', content:''}); setShowSectionModal(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold border border-indigo-100">قسم مخصص ＋</button>
+                      </div>
+
+                      {/* Render View Groups */}
+                      {VIEW_GROUPS.map(group => (
+                          <div key={group.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                              <h4 className="font-black text-slate-400 text-xs uppercase tracking-widest mb-4 border-b border-slate-50 pb-2">{group.title}</h4>
+                              <div className="space-y-3">
+                                  {group.items.map(view => {
+                                      const isEnabled = (localSettings.enabledViews || Object.values(AppView)).includes(view.id);
+                                      const label = localSettings.viewLabels?.[view.id] || view.defaultLabel;
+                                      
+                                      return (
+                                          <div key={view.id} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-2xl transition-colors">
+                                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${isEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                  {view.defaultIcon}
+                                              </div>
+                                              <div className="flex-1">
+                                                  <input 
+                                                      type="text" 
+                                                      className={`bg-transparent font-bold text-sm w-full outline-none ${isEnabled ? 'text-slate-800' : 'text-slate-400 line-through'}`}
+                                                      value={label}
+                                                      onChange={e => updateViewLabel(view.id, e.target.value)}
+                                                      disabled={!isEnabled}
+                                                  />
+                                              </div>
+                                              <button 
+                                                  onClick={() => toggleViewEnabled(view.id)}
+                                                  className={`w-12 h-6 rounded-full relative transition-all ${isEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                              >
+                                                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isEnabled ? 'left-1' : 'left-7'}`}></div>
+                                              </button>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      ))}
+
+                      {/* Custom Sections */}
+                      {localSettings.customSections && localSettings.customSections.length > 0 && (
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-indigo-100 shadow-sm">
+                              <h4 className="font-black text-indigo-400 text-xs uppercase tracking-widest mb-4">الأقسام المضافة يدوياً</h4>
+                              {localSettings.customSections.map(sec => (
+                                  <div key={sec.id} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0">
+                                      <div className="flex items-center gap-3">
+                                          <span className="text-xl">{sec.icon}</span>
+                                          <span className="font-bold text-sm text-slate-800">{sec.title}</span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                          <button onClick={() => { setEditingSection(sec); setSectionForm({title:sec.title, icon:sec.icon, content:sec.content}); setShowSectionModal(true); }} className="text-xs text-indigo-600 font-bold px-2">تعديل</button>
+                                          <button onClick={() => handleDeleteSection(sec.id)} className="text-xs text-rose-500 font-bold px-2">حذف</button>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {expandedSection === 'branding' && (
+                  <div className="space-y-8 animate-fadeIn">
+                      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm space-y-6">
+                          <h4 className="font-black text-slate-800">التخصيص اليدوي</h4>
+                          <div className="grid grid-cols-2 gap-6">
+                              <div>
+                                  <label className="text-[10px] font-black text-slate-400 block mb-2">اللون الأساسي</label>
+                                  <div className="flex items-center gap-3">
+                                      <input type="color" className="w-12 h-12 rounded-xl cursor-pointer border-0" value={localSettings.branding.primaryColor} onChange={e => handleBrandingChange('primaryColor', e.target.value)} />
+                                      <span className="text-xs font-mono font-bold text-slate-600">{localSettings.branding.primaryColor}</span>
+                                  </div>
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-black text-slate-400 block mb-2">اللون الثانوي</label>
+                                  <div className="flex items-center gap-3">
+                                      <input type="color" className="w-12 h-12 rounded-xl cursor-pointer border-0" value={localSettings.branding.secondaryColor} onChange={e => handleBrandingChange('secondaryColor', e.target.value)} />
+                                      <span className="text-xs font-mono font-bold text-slate-600">{localSettings.branding.secondaryColor}</span>
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div>
+                              <label className="text-[10px] font-black text-slate-400 block mb-2">نوع الخط</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                  {FONTS.map(f => (
+                                      <button 
+                                          key={f.id}
+                                          onClick={() => handleBrandingChange('fontFamily', f.id)}
+                                          className={`py-3 rounded-xl text-xs border transition-all ${localSettings.branding.fontFamily === f.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-100'}`}
+                                          style={{ fontFamily: f.id }}
+                                      >
+                                          {f.label}
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {expandedSection === 'content' && (
+                  <div className="space-y-8 animate-fadeIn bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                      <div>
+                          <label className="text-[10px] font-black text-slate-400 block mb-2">عنوان الصفحة الرئيسية</label>
+                          <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none" value={localSettings.contentTexts.landingTitle} onChange={e => handleContentChange('landingTitle', e.target.value)} />
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-black text-slate-400 block mb-2">الوصف الفرعي</label>
+                          <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none" value={localSettings.contentTexts.landingSubtitle} onChange={e => handleContentChange('landingSubtitle', e.target.value)} />
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-black text-slate-400 block mb-2">رسالة ترحيب الطالب</label>
+                          <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none" value={localSettings.studentWelcomeMsg} onChange={e => handleChange('studentWelcomeMsg', e.target.value)} />
+                      </div>
+                  </div>
+              )}
+
+              {expandedSection === 'security' && (
+                  <div className="space-y-8 animate-fadeIn">
+                      <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
+                          <h4 className="font-black text-lg mb-4">🔐 كود المعلم (المفتاح الرئيسي)</h4>
+                          <input 
+                              type="text" 
+                              className="w-full p-4 bg-white/10 rounded-2xl font-black text-center text-2xl tracking-widest outline-none border border-white/20 focus:border-white/50"
+                              value={localSettings.adminCode}
+                              onChange={e => handleChange('adminCode', e.target.value)}
+                          />
+                          <p className="text-[10px] text-slate-400 mt-2 text-center">يستخدم للدخول إلى لوحة التحكم هذه.</p>
+                      </div>
+
+                      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                          <h4 className="font-black text-slate-800 mb-6">المساعدين (Assistants)</h4>
+                          <div className="flex gap-4 mb-6">
+                              <input type="text" placeholder="اسم المساعد" className="flex-1 p-4 bg-slate-50 rounded-2xl font-bold text-xs outline-none" value={newAssistantName} onChange={e => setNewAssistantName(e.target.value)} />
+                              <button onClick={handleAddAssistant} className="px-6 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg">إضافة</button>
+                          </div>
+                          
+                          <div className="space-y-3">
+                              {assistants.map(asst => (
+                                  <div key={asst.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                      <div>
+                                          <p className="font-black text-slate-800 text-xs">{asst.name}</p>
+                                          <p className="text-[10px] font-mono text-indigo-500">Code: {asst.code}</p>
+                                      </div>
+                                      <button onClick={() => onDeleteAssistant(asst.id)} className="text-rose-500 font-bold text-xs px-2">حذف</button>
+                                  </div>
+                              ))}
+                              {assistants.length === 0 && <p className="text-center text-slate-400 text-xs">لا يوجد مساعدين حالياً.</p>}
+                          </div>
+                      </div>
+                  </div>
+              )}
           </div>
-        ))}
       </div>
 
-      {/* Custom Section Editor Modal */}
+      {/* Modal for Custom Sections */}
       {showSectionModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-2xl p-10 rounded-[3.5rem] shadow-2xl relative animate-slideUp overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-center mb-8 border-b border-slate-50 pb-6">
-              <h3 className="text-2xl font-black text-slate-800">
-                {editingSection ? 'تعديل القسم' : 'إضافة قسم جديد'}
-              </h3>
-              <button onClick={() => setShowSectionModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all">✕</button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-4 gap-6">
-                <div className="col-span-1 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 px-2 uppercase">الأيقونة</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-4 bg-slate-50 rounded-2xl text-center text-2xl outline-none focus:ring-2 focus:ring-indigo-600" 
-                    value={sectionForm.icon} 
-                    onChange={e => setSectionForm({...sectionForm, icon: e.target.value})} 
-                    placeholder="📄"
-                  />
+            <h3 className="text-2xl font-black text-slate-800 mb-6">إضافة قسم مخصص</h3>
+            <div className="space-y-4">
+                <input type="text" placeholder="عنوان القسم" className="w-full p-4 bg-slate-50 rounded-2xl font-bold" value={sectionForm.title} onChange={e => setSectionForm({...sectionForm, title: e.target.value})} />
+                <div className="flex gap-4">
+                    <input type="text" placeholder="الأيقونة (Emoji)" className="w-24 p-4 bg-slate-50 rounded-2xl text-center text-xl" value={sectionForm.icon} onChange={e => setSectionForm({...sectionForm, icon: e.target.value})} />
+                    <p className="text-xs text-slate-400 self-center">اختر رمزاً تعبيرياً ليميز القسم في القائمة.</p>
                 </div>
-                <div className="col-span-3 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 px-2 uppercase">عنوان القسم</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-6 py-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-600" 
-                    value={sectionForm.title} 
-                    onChange={e => setSectionForm({...sectionForm, title: e.target.value})} 
-                    placeholder="مثال: مراجعات ليلة الامتحان"
-                  />
+                <textarea placeholder="المحتوى (نص، روابط، تعليمات...)" className="w-full p-4 bg-slate-50 rounded-2xl font-medium h-40 outline-none" value={sectionForm.content} onChange={e => setSectionForm({...sectionForm, content: e.target.value})} />
+                
+                <div className="flex gap-3 pt-4">
+                    <button onClick={handleSaveSection} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black">حفظ</button>
+                    <button onClick={() => setShowSectionModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black">إلغاء</button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 px-2 uppercase">المحتوى (يدعم Markdown)</label>
-                <textarea 
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] font-medium text-sm h-64 outline-none focus:ring-2 focus:ring-indigo-600 resize-none leading-relaxed"
-                  value={sectionForm.content} 
-                  onChange={e => setSectionForm({...sectionForm, content: e.target.value})} 
-                  placeholder="اكتب المحتوى هنا..."
-                />
-              </div>
-
-              <button 
-                onClick={handleSaveSection}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black shadow-xl hover:scale-[1.01] transition-transform"
-              >
-                حفظ التغييرات ✓
-              </button>
             </div>
           </div>
         </div>

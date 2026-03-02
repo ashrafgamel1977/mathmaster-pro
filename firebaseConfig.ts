@@ -9,7 +9,7 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // تغيير هذا المتغير إلى true لإجبار التطبيق على العمل في الوضع غير المتصل (Offline Mode)
 // هذا يحل مشكلة "Could not reach Cloud Firestore backend" عند عدم توفر اتصال
-const FORCE_OFFLINE = true;
+const FORCE_OFFLINE = false;
 
 const PERMANENT_CONFIG = {
   apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",

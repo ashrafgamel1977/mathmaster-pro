@@ -1,15 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Assignment, AssignmentSubmission, Student } from '../types';
-import InteractiveBoard from './InteractiveBoard';
 
 interface AssignmentGradingProps {
   submission: AssignmentSubmission;
   student?: Student;
   assignment?: Assignment;
-  onGrade: (submissionId: string, grade: number, feedback: string, correctedImg: string) => void; // Keeps original signature but we will inject audio into parent
+  onGrade: (submissionId: string, grade: number, feedback: string, correctedImg: string) => void;
   onCancel: () => void;
-  aiParams?: { grade: number, feedback: string } | null;
 }
 
 const AssignmentGrading: React.FC<AssignmentGradingProps> = ({ 
@@ -18,13 +15,12 @@ const AssignmentGrading: React.FC<AssignmentGradingProps> = ({
   assignment, 
   onGrade, 
   onCancel,
-  aiParams 
 }) => {
   const [grade, setGrade] = useState<string>(
-    aiParams?.grade?.toString() || submission.grade?.toString() || ''
+    submission.grade?.toString() || ''
   );
   const [feedback, setFeedback] = useState<string>(
-    aiParams?.feedback || submission.feedback || ''
+    submission.feedback || ''
   );
   
   // Voice Recording State
@@ -32,14 +28,7 @@ const AssignmentGrading: React.FC<AssignmentGradingProps> = ({
   const [audioUrl, setAudioUrl] = useState<string | null>(submission.audioFeedback || null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  useEffect(() => {
-    if (aiParams) {
-        if (aiParams.grade !== undefined) setGrade(aiParams.grade.toString());
-        if (aiParams.feedback) setFeedback(aiParams.feedback);
-    }
-  }, [aiParams]);
-
+  
   const startRecording = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -80,119 +69,107 @@ const AssignmentGrading: React.FC<AssignmentGradingProps> = ({
       setAudioUrl(null);
   };
 
-  const handleFinalSave = (boardDataUrl: string) => {
+  const handleFinalSave = () => {
     if (!grade) {
       alert('يرجى إدخال الدرجة أولاً');
       return;
     }
-    // We append the audio URL to the submission object in parent by passing it somehow.
-    // Since onGrade signature is fixed in the interface, we usually update the parent.
-    // However, here we will attach the audio to the submission object temporarily
-    // OR we assume the parent handles `submission` object update.
-    // For this specific architecture, let's inject it into the submission object reference directly 
-    // or rely on a hacked `feedback` string if backend doesn't support it yet?
-    // BETTER: The parent `AssignmentsView` should update the submission including audio.
-    // But `onGrade` only takes specific args.
-    // Let's modify the parent `onGrade` logic to accept the whole submission update or modify the submission object before calling onGrade.
-    
-    // Quick Fix: Modifying the submission object directly in memory before passing up 
-    // (This works because objects are passed by reference in JS/React props usually, 
-    // but cleaner is to update `onGrade` in parent. For now, let's update submission ref)
     submission.audioFeedback = audioUrl || undefined;
-    
-    onGrade(submission.id, parseInt(grade), feedback, boardDataUrl);
+    // Pass empty string for correctedImg since board is removed
+    onGrade(submission.id, parseInt(grade), feedback, "");
   };
 
   return (
-    <div className="fixed inset-0 z-[600] bg-indigo-950 flex flex-col lg:flex-row overflow-hidden animate-fadeIn">
-      {/* Sidebar - Grading Controls */}
-      <div className="w-full lg:w-96 bg-white flex flex-col shadow-2xl z-10 border-l border-indigo-100">
-        <div className="p-8 bg-indigo-600 text-white text-right">
-          <div className="flex justify-between items-start mb-6">
-            <button onClick={onCancel} className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all">✕</button>
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">
-                {aiParams ? '🤖' : '✍️'}
-            </div>
-          </div>
-          <h2 className="text-xl font-black mb-1">{aiParams ? 'مراجعة التصحيح الذكي' : 'تصحيح واجب الطالب'}</h2>
-          <p className="text-indigo-100 text-xs font-bold opacity-80">{student?.name || submission.studentName}</p>
+    <div className="fixed inset-0 z-[600] bg-slate-100 flex flex-col lg:flex-row-reverse overflow-hidden animate-fadeIn font-['Cairo']" dir="rtl">
+      
+      {/* Grading Panel (Right Side) */}
+      <div className="w-full lg:w-[480px] bg-white h-full shadow-2xl z-20 flex flex-col border-l border-slate-200">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+           <div>
+             <h2 className="text-xl font-black text-slate-800">تصحيح الواجب</h2>
+             <p className="text-xs font-bold text-slate-400 mt-1">{student?.name || submission.studentName}</p>
+           </div>
+           <button onClick={onCancel} className="w-10 h-10 bg-slate-50 hover:bg-rose-50 hover:text-rose-500 rounded-xl flex items-center justify-center transition-colors">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-8 text-right no-scrollbar" dir="rtl">
-          <div>
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">الدرجة النهائية (%)</label>
-            <div className="relative">
-              <input 
-                type="number" 
-                max="100"
-                min="0"
-                className={`w-full py-6 border-2 focus:border-indigo-600 rounded-3xl font-black text-5xl text-center text-indigo-700 outline-none transition-all shadow-inner ${aiParams ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-transparent'}`}
-                value={grade}
-                onChange={e => setGrade(e.target.value)}
-                placeholder="0"
-              />
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-indigo-200">%</span>
-            </div>
-          </div>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+           {/* Grade Input - Big and Clear */}
+           <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase">الدرجة المستحقة</label>
+              <div className="flex items-center gap-4">
+                 <div className="relative flex-1">
+                    <input 
+                      type="number" 
+                      value={grade} 
+                      onChange={e => setGrade(e.target.value)}
+                      className="w-full h-20 bg-indigo-50 rounded-3xl text-center text-5xl font-black text-indigo-600 outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                      placeholder="00"
+                      max={100}
+                      min={0}
+                    />
+                    <span className="absolute top-1/2 left-6 -translate-y-1/2 text-indigo-300 font-black text-xl">%</span>
+                 </div>
+                 {/* Quick Presets */}
+                 <div className="flex flex-col gap-2">
+                    <button onClick={() => setGrade('100')} className="px-3 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black hover:bg-emerald-200">100%</button>
+                    <button onClick={() => setGrade('50')} className="px-3 py-2 bg-amber-100 text-amber-700 rounded-xl text-xs font-black hover:bg-amber-200">50%</button>
+                 </div>
+              </div>
+           </div>
 
-          <div>
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">ملاحظات صوتية 🎙️</label>
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+           {/* Feedback */}
+           <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase">ملاحظات المعلم</label>
+              <textarea 
+                value={feedback}
+                onChange={e => setFeedback(e.target.value)}
+                className="w-full h-32 bg-slate-50 rounded-3xl p-5 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                placeholder="اكتب ملاحظاتك هنا..."
+              />
+              {/* Audio Recorder */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
                 {!audioUrl ? (
                     !isRecording ? (
-                        <button onClick={startRecording} className="w-16 h-16 bg-rose-500 rounded-full shadow-lg flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform mx-auto">
-                            🎙️
+                        <button onClick={startRecording} className="w-full py-3 bg-blue-100 text-blue-600 rounded-xl font-black text-xs hover:bg-blue-200 transition-all flex items-center justify-center gap-2">
+                            <span>🎙️</span> تسجيل ملاحظة صوتية
                         </button>
                     ) : (
-                        <button onClick={stopRecording} className="w-16 h-16 bg-white border-4 border-rose-500 rounded-full shadow-lg flex items-center justify-center animate-pulse mx-auto">
-                            <div className="w-6 h-6 bg-rose-500 rounded"></div>
+                        <button onClick={stopRecording} className="w-full py-3 bg-rose-100 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-200 transition-all animate-pulse">
+                            ⏹ إيقاف التسجيل
                         </button>
                     )
                 ) : (
-                    <div className="flex flex-col items-center gap-3">
-                        <audio src={audioUrl} controls className="w-full h-8" />
-                        <button onClick={deleteRecording} className="text-xs text-rose-500 font-bold hover:underline">حذف التسجيل 🗑️</button>
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200">
+                        <audio src={audioUrl} controls className="flex-1 h-8" />
+                        <button onClick={deleteRecording} className="w-8 h-8 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center hover:bg-rose-100">🗑️</button>
                     </div>
                 )}
-                <p className="text-[10px] text-slate-400 mt-2 font-bold">{isRecording ? 'جاري التسجيل...' : audioUrl ? 'تم تسجيل الملاحظة' : 'اضغط للتسجيل'}</p>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">ملاحظات نصية</label>
-            <textarea 
-              className={`w-full p-5 border rounded-[2rem] font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none transition-all ${aiParams ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-100'}`}
-              placeholder="مثال: أحسنت يا بطل..."
-              value={feedback}
-              onChange={e => setFeedback(e.target.value)}
-            />
-          </div>
+              </div>
+           </div>
         </div>
 
-        <div className="p-8 border-t border-gray-100">
-          <button 
-            onClick={() => {
-              alert('يرجى الضغط على "حفظ العمل" داخل السبورة لاعتماد التعديلات والدرجة.');
-            }}
-            className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 group"
-          >
-            <span>اعتماد وحفظ التصحيح</span>
-            <span className="group-hover:translate-x-[-4px] transition-transform">✓</span>
-          </button>
+        {/* Footer Actions */}
+        <div className="p-6 border-t border-slate-100 bg-slate-50">
+           <button onClick={handleFinalSave} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 hover:scale-[1.02]">
+             <span>حفظ وإرسال النتيجة</span>
+             <span>🚀</span>
+           </button>
         </div>
       </div>
 
-      {/* Main Area - Interactive Board */}
-      <div className="flex-1 bg-slate-100 relative p-4 lg:p-10">
-        <div className="w-full h-full bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border-8 border-white">
-          <InteractiveBoard 
-            imageUrl={submission.fileUrl}
-            onSave={handleFinalSave}
-            onCancel={onCancel}
-            title={`تصحيح حل: ${student?.name || submission.studentName}`}
-          />
-        </div>
+      {/* Submission View (Left Side) */}
+      <div className="flex-1 bg-slate-200 relative flex flex-col overflow-hidden items-center justify-center p-8">
+         <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border-4 border-white max-h-full max-w-full">
+            {submission.fileUrl ? (
+                <img src={submission.fileUrl} alt="Submission" className="max-w-full max-h-full object-contain" />
+            ) : (
+                <div className="p-10 text-center text-slate-400 font-bold">لا يوجد ملف مرفق</div>
+            )}
+         </div>
       </div>
+
     </div>
   );
 };

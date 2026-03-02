@@ -1,14 +1,11 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Quiz, Year, EducationalSource, MathNotation, AppView, PlatformSettings } from '../types';
-import { generateQuizFromContent } from '../services/geminiService';
-import MathRenderer from '../components/MathRenderer';
-import InteractiveBoard from '../components/InteractiveBoard';
+import React, { useState, useRef } from 'react';
+import { Quiz, Year, EducationalSource, MathNotation, PlatformSettings } from '../types';
 
-interface Question {
+interface QuizQuestion {
   id: string;
   type: 'mcq' | 'fill_blanks' | 'short_answer';
-  question: string;
+  question: string; // Will hold text or image URL
   options?: string[];
   correctAnswer: string | number;
   points: number;
@@ -18,148 +15,94 @@ interface QuizGeneratorProps {
   years: Year[];
   sources: EducationalSource[];
   notation: MathNotation;
-  quizzes?: Quiz[]; // Added prop
+  quizzes?: Quiz[];
   onPublish: (title: string, yearId: string, questions: any[] | null, type: string, externalLink?: string, fileUrl?: string) => void;
-  onDelete?: (id: string) => void; // Added prop
+  onDelete?: (id: string) => void;
   settings?: PlatformSettings;
 }
 
-const MATH_BRANCHES = [
-  { id: 'algebra', name: 'جبر', icon: '🧮', color: 'from-blue-500 to-indigo-600' },
-  { id: 'geometry', name: 'هندسة', icon: '📐', color: 'from-emerald-500 to-teal-600' },
-  { id: 'calculus', name: 'تفاضل وتكامل', icon: '📈', color: 'from-rose-500 to-orange-600' },
-  { id: 'stats', name: 'إحصاء', icon: '📊', color: 'from-amber-500 to-yellow-600' },
-];
-
-const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublish, settings, quizzes = [], onDelete }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'create'>('list'); // New State
-  const [activeTab, setActiveTab] = useState<string>('ai');
+const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, onPublish, quizzes = [], onDelete }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'create'>('list');
   const [quizTitle, setQuizTitle] = useState('');
   const [targetYearId, setTargetYearId] = useState('');
-  const [difficulty, setDifficulty] = useState('medium');
-  const [qCount, setQCount] = useState(5);
-  
-  const [aiTopic, setAiTopic] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [manualQuestions, setManualQuestions] = useState<Question[]>([]);
-  const [showBoardModal, setShowBoardModal] = useState(false);
-  
-  const [scanPreview, setScanPreview] = useState<string | null>(null);
-  const scannerInputRef = useRef<HTMLInputElement>(null);
+  const [quizType, setQuizType] = useState<'native' | 'link' | 'file'>('native');
+  const [externalLink, setExternalLink] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default Tabs
-  const DEFAULT_TABS: { id: string; n: string; i: string; disabled?: boolean }[] = [
-    { id: 'ai', n: 'مولد الأسئلة', i: '🪄' },
-    { id: 'scanner', n: 'ماسح الورق', i: '📸' },
-    { id: 'editor', n: 'المحرر اليدوي', i: '✏️' },
-    { id: 'external', n: 'روابط خارجية', i: '🔗' },
-  ];
-
-  const tabs = React.useMemo(() => {
-    if (!settings?.featureConfig?.[AppView.QUIZZES]) return DEFAULT_TABS;
-    const config = settings.featureConfig[AppView.QUIZZES];
-    return DEFAULT_TABS.map(t => {
-        const conf = config.find(c => c.id === t.id);
-        if (conf) {
-            return { ...t, n: conf.label, disabled: !conf.enabled };
-        }
-        return t;
-    }).filter(t => !t.disabled);
-  }, [settings]);
-
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-        setActiveTab(tabs[0].id);
-    }
-  }, [tabs, activeTab]);
-
-  const handleAiGenerate = async (topicOverride?: string) => {
-    const finalTopic = topicOverride || aiTopic;
-    if (!finalTopic || !targetYearId) return alert('يرجى اختيار الصف الدراسي وتحديد الموضوع.');
-    
-    setIsGenerating(true);
-    try {
-      const generated = await generateQuizFromContent(finalTopic, scanPreview ? { data: scanPreview, mimeType: 'image/jpeg' } : undefined, notation, difficulty, qCount);
-      const formatted = generated.map((q: any) => ({
-        ...q,
-        id: Math.random().toString(36).substr(2, 9),
-        points: 1,
-        type: 'mcq'
-      }));
-      setManualQuestions(formatted);
-      setActiveTab('editor');
-      if (!quizTitle) setQuizTitle(`اختبار ${finalTopic}`);
-    } catch (e) {
-      alert('حدث خطأ أثناء المعالجة. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setIsGenerating(false);
-    }
+  const addQuestion = () => {
+    setQuestions([...questions, {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'mcq',
+      question: '',
+      options: ['أ', 'ب', 'ج', 'د'],
+      correctAnswer: 0,
+      points: 1
+    }]);
   };
 
-  const handleFileScan = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, qIndex: number) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        setScanPreview(ev.target?.result as string);
-        setActiveTab('ai');
+        const newQs = [...questions];
+        // Store image as markdown-like syntax for renderer to handle or just raw url
+        newQs[qIndex].question = `![img](${ev.target?.result})`; 
+        setQuestions(newQs);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const addManualQuestion = () => {
-    const newQ: Question = { 
-      id: Math.random().toString(36).substr(2, 9), 
-      type: 'mcq', 
-      question: '', 
-      options: ['', '', '', ''], 
-      correctAnswer: 0, 
-      points: 1 
-    };
-    setManualQuestions([...manualQuestions, newQ]);
-    setActiveTab('editor');
+  const handleMainFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setFileUrl(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const addStandardTemplate = () => {
-    const questions: Question[] = Array(5).fill(null).map((_, i) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      type: 'mcq',
-      question: `سؤال رقم ${i + 1}`,
-      options: ['الاختيار الأول', 'الاختيار الثاني', 'الاختيار الثالث', 'الاختيار الرابع'],
-      correctAnswer: 0,
-      points: 1
-    }));
-    setManualQuestions(questions);
-    setDifficulty('medium');
-    setQCount(5);
-    setActiveTab('editor');
-    if (!quizTitle) setQuizTitle('اختبار جديد (نموذج)');
+  const updateQuestion = (index: number, field: keyof QuizQuestion, value: any) => {
+    const newQs = [...questions];
+    newQs[index] = { ...newQs[index], [field]: value };
+    setQuestions(newQs);
   };
 
   const handlePublish = () => {
-      onPublish(quizTitle, targetYearId, manualQuestions, 'native');
-      // Reset and go back to list
-      setManualQuestions([]);
-      setQuizTitle('');
-      setViewMode('list');
+    if (!quizTitle || !targetYearId) return alert('يرجى إكمال البيانات الأساسية');
+    
+    if (quizType === 'native' && questions.length === 0) return alert('يرجى إضافة سؤال واحد على الأقل');
+    if (quizType === 'link' && !externalLink) return alert('يرجى إضافة الرابط');
+    if (quizType === 'file' && !fileUrl) return alert('يرجى رفع الملف');
+
+    onPublish(quizTitle, targetYearId, quizType === 'native' ? questions : null, quizType, externalLink, fileUrl);
+    
+    setQuizTitle('');
+    setQuestions([]);
+    setExternalLink('');
+    setFileUrl('');
+    setQuizType('native');
+    setViewMode('list');
   };
 
-  // --- View: List of Quizzes ---
   if (viewMode === 'list') {
       return (
         <div className="max-w-7xl mx-auto space-y-10 animate-slideUp pb-24 text-right px-4 md:px-0" dir="rtl">
             <div className="bg-indigo-900 p-10 md:p-14 rounded-[4rem] text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_10%_20%,_rgba(255,255,255,0.1),transparent_60%)]"></div>
                 <div className="relative z-10 space-y-2">
                     <h2 className="text-3xl md:text-5xl font-black tracking-tight">إدارة الاختبارات ⚡</h2>
-                    <p className="text-indigo-200 font-bold text-sm md:text-lg">لديك {quizzes.length} اختبار منشور للطلاب.</p>
+                    <p className="text-indigo-200 font-bold text-sm md:text-lg">نظام الامتحانات الشامل (أسئلة، روابط، ملفات).</p>
                 </div>
                 <button 
                     onClick={() => setViewMode('create')}
                     className="relative z-10 px-10 py-5 bg-white text-indigo-900 rounded-[2.5rem] font-black text-sm shadow-xl hover:scale-105 transition-all flex items-center gap-2"
                 >
-                    <span>إنشاء اختبار جديد</span>
+                    <span>اختبار جديد</span>
                     <span className="text-xl">＋</span>
                 </button>
             </div>
@@ -181,267 +124,140 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ years, notation, onPublis
                         <h3 className="text-xl font-black text-slate-800 mb-2">{quiz.title}</h3>
                         <div className="flex items-center gap-4 text-xs font-bold text-slate-400 mt-4">
                             <span className="flex items-center gap-1">📅 {quiz.date}</span>
-                            <span className="flex items-center gap-1">📝 {quiz.questions?.length || 0} أسئلة</span>
+                            {quiz.type === 'native' && <span className="flex items-center gap-1">📝 {quiz.questions?.length || 0} أسئلة</span>}
+                            {quiz.type === 'link' && <span className="flex items-center gap-1">🔗 رابط خارجي</span>}
+                            {quiz.type === 'file' && <span className="flex items-center gap-1">📁 ملف مرفق</span>}
                         </div>
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-right"></div>
                     </div>
                 ))}
-                {quizzes.length === 0 && (
-                    <div className="col-span-full py-32 text-center opacity-40 bg-white rounded-[4rem] border-4 border-dashed border-slate-200">
-                        <span className="text-6xl block mb-4">📭</span>
-                        <p className="font-black text-xl text-slate-500">لا توجد اختبارات منشورة بعد.</p>
-                        <p className="text-sm font-bold text-slate-400 mt-2">اضغط على زر "إنشاء اختبار جديد" في الأعلى للبدء.</p>
-                    </div>
-                )}
             </div>
         </div>
       );
   }
 
-  // --- View: Create Quiz (Existing Generator UI) ---
   return (
-    <div className="max-w-7xl mx-auto space-y-10 animate-slideUp pb-24 text-right px-4 md:px-0" dir="rtl">
-      {/* Header with Back Button */}
-      <div className="flex items-center justify-between mb-4">
-          <button onClick={() => setViewMode('list')} className="px-6 py-3 bg-white rounded-2xl text-slate-500 font-black text-xs shadow-sm hover:text-indigo-600 transition-all">← العودة للقائمة</button>
-          <h3 className="font-black text-slate-400 text-sm uppercase tracking-widest">وضع الإنشاء</h3>
-      </div>
+    <div className="max-w-5xl mx-auto space-y-8 animate-slideUp pb-24 text-right" dir="rtl">
+       <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+          <button onClick={() => setViewMode('list')} className="text-slate-400 font-bold hover:text-slate-600">إلغاء</button>
+          <h3 className="text-xl font-black text-slate-800">إنشاء اختبار جديد</h3>
+          <button onClick={handlePublish} className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs hover:bg-indigo-700 shadow-lg">نشر الاختبار ✓</button>
+       </div>
 
-      {/* Dynamic Lab Header */}
-      <div className="relative overflow-hidden rounded-[4rem] bg-slate-900 p-10 md:p-16 text-white shadow-2xl border border-white/5">
-        <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_10%_20%,_rgba(59,130,246,0.1),transparent_50%)]"></div>
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-12">
-          <div className="space-y-6 text-center lg:text-right">
-            <h2 className="text-4xl md:text-6xl font-black tracking-tight">مُختبر <span className="text-blue-400">الرياضيات</span> الذكي 🧬</h2>
-            <p className="text-slate-400 text-sm md:text-xl max-w-2xl font-medium">أستاذ أشرف، ابدأ بصناعة اختبارك الآن بأي طريقة تفضلها.</p>
-          </div>
-          
-          <div className="flex bg-white/5 backdrop-blur-2xl p-2 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-x-auto no-scrollbar max-w-full">
-            {tabs.map(tab => (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-none px-8 py-4 rounded-[2rem] font-black text-xs transition-all flex items-center gap-3 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-xl scale-105' : 'text-slate-400 hover:text-white'}`}
-              >
-                <span>{tab.i}</span> <span>{tab.n}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <input type="text" placeholder="عنوان الاختبار (مثال: امتحان الشهر الأول)" className="w-full p-5 bg-white rounded-2xl font-bold border border-slate-200 outline-none focus:border-indigo-600" value={quizTitle} onChange={e => setQuizTitle(e.target.value)} />
+          <select className="w-full p-5 bg-white rounded-2xl font-bold border border-slate-200 outline-none" value={targetYearId} onChange={e => setTargetYearId(e.target.value)}>
+             <option value="">اختر الصف الدراسي...</option>
+             {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+          </select>
+       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-        {/* Advanced Config Sidebar */}
-        <div className="lg:col-span-1 space-y-8">
-           <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 space-y-8 sticky top-12">
-              <div className="space-y-4">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">إعدادات الاختبار</label>
-                 <input type="text" placeholder="عنوان الاختبار..." className="w-full px-6 py-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all" value={quizTitle} onChange={e => setQuizTitle(e.target.value)} />
-                 <select className="w-full px-6 py-4 bg-slate-50 rounded-2xl font-black text-xs outline-none cursor-pointer" value={targetYearId} onChange={e => setTargetYearId(e.target.value)}>
-                    <option value="">اختر الصف الدراسي...</option>
-                    {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
-                 </select>
-              </div>
+       {/* Type Selection */}
+       <div className="flex bg-white p-2 rounded-[2rem] border border-slate-100 shadow-sm">
+          <button onClick={() => setQuizType('native')} className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all ${quizType === 'native' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>أسئلة تفاعلية 📝</button>
+          <button onClick={() => setQuizType('link')} className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all ${quizType === 'link' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>رابط خارجي 🔗</button>
+          <button onClick={() => setQuizType('file')} className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all ${quizType === 'file' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>ملف / صورة 📁</button>
+       </div>
 
-              <div className="space-y-4 pt-6 border-t border-slate-50">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">مستوى الصعوبة</label>
-                 <div className="flex bg-slate-50 p-1.5 rounded-2xl">
-                    {['easy', 'medium', 'hard'].map(lv => (
-                       <button key={lv} onClick={() => setDifficulty(lv)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${difficulty === lv ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>
-                          {lv === 'easy' ? 'أساسي' : lv === 'medium' ? 'متوسط' : 'متفوقين'}
-                       </button>
-                    ))}
-                 </div>
-              </div>
+       {/* Native Questions Editor */}
+       {quizType === 'native' && (
+         <>
+            <div className="flex gap-4">
+                <button onClick={addQuestion} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg hover:scale-[1.01] transition-transform">إضافة سؤال (صورة/نص) ➕</button>
+            </div>
 
-              <div className="space-y-4">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">عدد الأسئلة: {qCount}</label>
-                 <input type="range" min="3" max="20" className="w-full accent-blue-600" value={qCount} onChange={e => setQCount(parseInt(e.target.value))} />
-              </div>
+            <div className="space-y-6">
+                {questions.map((q, idx) => (
+                    <div key={idx} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-lg relative group">
+                        <button onClick={() => { const n = [...questions]; n.splice(idx, 1); setQuestions(n); }} className="absolute top-6 left-6 text-rose-400 hover:text-rose-600 font-bold text-xs bg-rose-50 px-3 py-1 rounded-lg">حذف السؤال</button>
+                        
+                        <h4 className="font-black text-slate-800 mb-4 flex items-center gap-2">
+                            <span className="bg-indigo-100 text-indigo-600 w-8 h-8 flex items-center justify-center rounded-lg">{idx + 1}</span>
+                            سؤال جديد
+                        </h4>
 
-              <button 
-                onClick={addStandardTemplate}
-                className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-xs hover:bg-indigo-100 transition-all border border-indigo-200 border-dashed flex items-center justify-center gap-2"
-              >
-                <span>+ نموذج قياسي (5 أسئلة)</span>
-              </button>
-           </div>
-        </div>
+                        <div className="flex flex-col gap-4">
+                            {q.question.startsWith('![img]') ? (
+                                <div className="relative">
+                                    <img src={q.question.slice(7, -1)} className="max-h-60 rounded-2xl border border-slate-200" alt="Question" />
+                                    <button onClick={() => updateQuestion(idx, 'question', '')} className="text-rose-500 text-xs font-bold mt-2">إزالة الصورة</button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <input 
+                                    type="text" 
+                                    placeholder="نص السؤال (أو الصق صورة هنا)" 
+                                    className="flex-1 p-4 bg-slate-50 rounded-2xl font-bold text-sm outline-none" 
+                                    value={q.question}
+                                    onChange={e => updateQuestion(idx, 'question', e.target.value)}
+                                    />
+                                    <label className="p-4 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100">
+                                        📷
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, idx)} />
+                                    </label>
+                                </div>
+                            )}
 
-        {/* Main Interface Content */}
-        <div className="lg:col-span-3">
-           {activeTab === 'ai' && (
-             <div className="space-y-8 animate-fadeIn">
-                {/* Topic Templates */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                   {MATH_BRANCHES.map(branch => (
-                     <button 
-                       key={branch.id} 
-                       onClick={() => handleAiGenerate(branch.name)}
-                       className={`p-6 rounded-[2.5rem] bg-gradient-to-br ${branch.color} text-white text-center space-y-3 shadow-lg hover:scale-105 transition-all group`}
-                     >
-                        <span className="text-4xl block group-hover:rotate-12 transition-transform">{branch.icon}</span>
-                        <span className="font-black text-xs">توليد {branch.name}</span>
-                     </button>
-                   ))}
-                </div>
-
-                <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-xl text-center space-y-10 relative overflow-hidden">
-                   {scanPreview && (
-                     <div className="absolute top-4 left-4 flex items-center gap-3 p-2 bg-blue-50 rounded-2xl border border-blue-100">
-                        <img src={scanPreview} className="w-12 h-12 rounded-lg object-cover" alt="Scan" />
-                        <div className="text-right">
-                           <p className="text-[9px] font-black text-blue-600 uppercase">تم التقاط الملف ✓</p>
-                           <button onClick={() => setScanPreview(null)} className="text-[8px] text-rose-500 font-bold">إلغاء المسح</button>
+                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                {q.options?.map((opt, optIdx) => (
+                                    <div key={optIdx} onClick={() => updateQuestion(idx, 'correctAnswer', optIdx)} className={`p-4 rounded-2xl border-2 cursor-pointer flex items-center gap-3 transition-all ${q.correctAnswer === optIdx ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${q.correctAnswer === optIdx ? 'border-emerald-500' : 'border-slate-300'}`}>
+                                            {q.correctAnswer === optIdx && <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>}
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            className="bg-transparent outline-none font-bold text-sm w-full" 
+                                            value={opt}
+                                            onChange={(e) => {
+                                                const newOpts = [...(q.options || [])];
+                                                newOpts[optIdx] = e.target.value;
+                                                updateQuestion(idx, 'options', newOpts);
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                     </div>
-                   )}
-
-                   <div className="max-w-xl mx-auto space-y-8">
-                      <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-[2.5rem] mx-auto flex items-center justify-center text-5xl">🪄</div>
-                      <h3 className="text-3xl font-black text-slate-800">صناعة فورية بالذكاء الاصطناعي</h3>
-                      <input 
-                        type="text" 
-                        placeholder="اكتب موضوع الدرس (مثال: بحث إشارة الدالة)" 
-                        className="w-full px-10 py-7 bg-slate-50 rounded-[2.5rem] border-4 border-transparent focus:border-blue-500 focus:bg-white text-center font-black text-lg outline-none transition-all shadow-inner"
-                        value={aiTopic}
-                        onChange={e => setAiTopic(e.target.value)}
-                      />
-                      <button 
-                        onClick={() => handleAiGenerate()}
-                        disabled={isGenerating || !aiTopic}
-                        className="w-full py-7 bg-slate-900 text-white font-black rounded-[2.5rem] text-xl shadow-2xl hover:scale-[1.01] transition-all disabled:opacity-50"
-                      >
-                        {isGenerating ? 'جاري التحليل والابتكار...' : 'توليد الاختبار الآن ✨'}
-                      </button>
-                   </div>
-                </div>
-             </div>
-           )}
-
-           {activeTab === 'scanner' && (
-             <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-xl text-center space-y-10 animate-fadeIn">
-                <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] mx-auto flex items-center justify-center text-5xl">📸</div>
-                <div className="space-y-4">
-                   <h3 className="text-3xl font-black text-slate-800">ماسح الأوراق الذكي</h3>
-                   <p className="text-slate-400 font-medium">حول ملزمتك الورقية أو امتحان قديم إلى اختبار رقمي في ثوانٍ.</p>
-                </div>
-                <div className="max-w-md mx-auto p-10 border-4 border-dashed border-slate-100 rounded-[3rem] space-y-6 hover:border-emerald-500 transition-all cursor-pointer" onClick={() => scannerInputRef.current?.click()}>
-                   <span className="text-6xl block mb-4">📄</span>
-                   <p className="font-black text-slate-400">اضغط هنا لرفع صورة أو تصوير ورقة</p>
-                   <input type="file" ref={scannerInputRef} className="hidden" accept="image/*" onChange={handleFileScan} />
-                </div>
-             </div>
-           )}
-
-           {activeTab === 'editor' && (
-             <div className="space-y-8 animate-fadeIn">
-                <div className="flex gap-4">
-                   <button onClick={addManualQuestion} className="flex-1 p-8 bg-white border border-slate-100 rounded-[3rem] shadow-lg flex items-center justify-center gap-4 hover:border-blue-600 transition-all group">
-                      <span className="text-3xl group-hover:rotate-12 transition-transform">➕</span>
-                      <span className="font-black text-slate-800">سؤال نصي</span>
-                   </button>
-                   <button onClick={() => setShowBoardModal(true)} className="flex-1 p-8 bg-white border border-slate-100 rounded-[3rem] shadow-lg flex items-center justify-center gap-4 hover:border-amber-600 transition-all group">
-                      <span className="text-3xl group-hover:rotate-12 transition-transform">🖋️</span>
-                      <span className="font-black text-slate-800">سؤال من السبورة</span>
-                   </button>
-                </div>
-
-                {manualQuestions.map((q, idx) => (
-                  <div key={q.id} className="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-50 space-y-8 relative group">
-                     <div className="flex justify-between items-center border-b border-slate-50 pb-6">
-                        <div className="flex items-center gap-4">
-                           <span className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black">#{idx + 1}</span>
-                           <h4 className="font-black text-slate-800">سؤال الاختبار</h4>
-                        </div>
-                        <button onClick={() => setManualQuestions(prev => prev.filter(x => x.id !== q.id))} className="text-rose-400 hover:text-rose-600">حذف</button>
-                     </div>
-
-                     <div className="space-y-6">
-                        {q.question.includes('![السبورة]') ? (
-                          <div className="flex flex-col items-center">
-                             <img src={q.question.match(/\((.*?)\)/)?.[1]} className="max-h-64 rounded-3xl border shadow-lg" alt="" />
-                             <span className="text-[10px] font-black text-blue-600 mt-4 uppercase">تم الالتقاط من السبورة ✓</span>
-                          </div>
-                        ) : (
-                          <textarea 
-                            className="w-full p-8 bg-slate-50 rounded-3xl font-bold text-lg outline-none focus:ring-4 focus:ring-blue-600/5 h-40" 
-                            placeholder="اكتب نص المسألة هنا.. استخدم $ $ للرموز الرياضية."
-                            value={q.question}
-                            onChange={e => setManualQuestions(prev => prev.map(x => x.id === q.id ? {...x, question: e.target.value} : x))}
-                          />
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           {q.options?.map((opt, oi) => (
-                             <div key={oi} className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${q.correctAnswer === oi ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-slate-100'}`}>
-                                <input type="radio" checked={q.correctAnswer === oi} onChange={() => setManualQuestions(prev => prev.map(x => x.id === q.id ? {...x, correctAnswer: oi} : x))} />
-                                <input 
-                                  type="text" 
-                                  className="bg-transparent font-bold text-sm w-full outline-none" 
-                                  value={opt} 
-                                  onChange={e => {
-                                    const newOpts = [...(q.options || [])];
-                                    newOpts[oi] = e.target.value;
-                                    setManualQuestions(prev => prev.map(x => x.id === q.id ? {...x, options: newOpts} : x));
-                                  }}
-                                  placeholder={`خيار ${oi + 1}`}
-                                />
-                             </div>
-                           ))}
-                        </div>
-                     </div>
-                  </div>
+                    </div>
                 ))}
+            </div>
+         </>
+       )}
 
-                {manualQuestions.length > 0 && (
-                   <div className="pt-10 flex justify-center">
-                      <button 
-                        onClick={handlePublish}
-                        disabled={!quizTitle || !targetYearId}
-                        className="px-20 py-7 bg-blue-600 text-white rounded-[2.5rem] font-black shadow-2xl hover:scale-105 transition-all disabled:opacity-50 text-xl"
-                      >نشر الاختبار النهائي لطلابك ✓</button>
-                   </div>
-                )}
-             </div>
-           )}
-
-           {activeTab === 'external' && (
-             <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-xl text-center space-y-10 animate-fadeIn">
-                <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2.5rem] mx-auto flex items-center justify-center text-5xl">🔗</div>
-                <div className="space-y-4">
-                   <h3 className="text-3xl font-black text-slate-800">روابط خارجية (Google Forms)</h3>
-                   <p className="text-slate-400 font-medium">أضف رابط أي اختبار خارجي وسيقوم النظام بدمجه داخل حساب الطالب.</p>
-                </div>
-                <div className="max-w-xl mx-auto space-y-6">
-                   <input type="text" placeholder="https://docs.google.com/forms/..." className="w-full px-8 py-5 bg-slate-50 rounded-2xl font-bold text-sm text-left" dir="ltr" />
-                   <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">نشر الرابط الخارجي</button>
-                </div>
-             </div>
-           )}
-        </div>
-      </div>
-
-      {showBoardModal && (
-        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-xl p-6 flex flex-col animate-fadeIn">
-           <div className="flex justify-between items-center mb-6 px-4 text-white">
-              <h3 className="text-2xl font-black">السبورة الذكية لإضافة المسائل</h3>
-              <button onClick={() => setShowBoardModal(false)} className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">✕</button>
-           </div>
-           <div className="flex-1 bg-white rounded-[4rem] overflow-hidden shadow-2xl">
-              <InteractiveBoard 
-                onSave={(dataUrl) => {
-                  const newQ: Question = { id: 'mq'+Date.now(), type: 'short_answer', question: `![السبورة](${dataUrl})`, correctAnswer: '', points: 5 };
-                  setManualQuestions([...manualQuestions, newQ]);
-                  setShowBoardModal(false);
-                  setActiveTab('editor');
-                }}
-                onCancel={() => setShowBoardModal(false)}
-                notation={notation}
+       {/* Link Editor */}
+       {quizType === 'link' && (
+          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-lg space-y-4 animate-fadeIn">
+              <h4 className="font-black text-slate-800">رابط الاختبار الخارجي</h4>
+              <p className="text-slate-400 text-xs font-bold">يمكنك وضع رابط Google Form أو Microsoft Quiz أو أي منصة أخرى.</p>
+              <input 
+                type="url" 
+                placeholder="https://docs.google.com/forms/..." 
+                className="w-full p-5 bg-slate-50 rounded-2xl font-bold text-sm outline-none border border-slate-200 focus:border-indigo-600 ltr"
+                value={externalLink}
+                onChange={e => setExternalLink(e.target.value)}
               />
-           </div>
-        </div>
-      )}
+          </div>
+       )}
+
+       {/* File Editor */}
+       {quizType === 'file' && (
+          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-lg space-y-4 animate-fadeIn text-center">
+              <h4 className="font-black text-slate-800">رفع ملف الاختبار</h4>
+              <p className="text-slate-400 text-xs font-bold">ارفع ملف PDF أو صورة للاختبار ليقوم الطالب بحله.</p>
+              
+              {fileUrl ? (
+                  <div className="relative inline-block">
+                      <img src={fileUrl} className="max-h-80 rounded-2xl border-4 border-slate-100 shadow-xl" alt="Quiz File" />
+                      <button onClick={() => setFileUrl('')} className="absolute -top-3 -right-3 w-8 h-8 bg-rose-500 text-white rounded-full shadow-lg flex items-center justify-center">✕</button>
+                  </div>
+              ) : (
+                  <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed border-slate-200 rounded-[2rem] p-10 cursor-pointer hover:bg-slate-50 transition-all">
+                      <span className="text-4xl block mb-2">📂</span>
+                      <span className="font-black text-indigo-600">اضغط لرفع الملف</span>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleMainFileUpload} />
+                  </div>
+              )}
+          </div>
+       )}
     </div>
   );
 };
