@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
 
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="manifest.json" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0f172a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -168,9 +168,8 @@
       <div style="margin-top: 10px; color: #64748b; font-size: 0.8rem;">جاري تجهيز المنصة...</div>
     </div>
 
-    <div id="root"></div>
+    <div id="root" data-focus-mode="active"></div>
     
-    <script type="module" src="index.tsx"></script>
     <script>
       // Remove loader when React takes over
       window.addEventListener('load', () => {
@@ -186,7 +185,7 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
             console.log('MathMaster PWA Active:', reg.scope);
           }).catch(err => {
             console.log('SW Registration failed:', err);

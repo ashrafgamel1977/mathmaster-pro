@@ -4,21 +4,20 @@ import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // ============================================================================
-// إعدادات Firebase الخاصة بمشروع MathMaster Pro (mathmaster-pri)
+// إعدادات Firebase - يتم تحميلها من ملف .env (لا تُضاف للكود مباشرة!)
 // ============================================================================
 
-// تغيير هذا المتغير إلى true لإجبار التطبيق على العمل في الوضع غير المتصل (Offline Mode)
-// هذا يحل مشكلة "Could not reach Cloud Firestore backend" عند عدم توفر اتصال
+// تغيير هذا المتغير إلى true لإجبار التطبيق على العمل في الوضع غير المتصل
 const FORCE_OFFLINE = false;
 
 const PERMANENT_CONFIG = {
-  apiKey: "AIzaSyCN2U3fVbLAWV5zrpBnZxxu-XfjRtev3tA",
-  authDomain: "mathmaster-pri.firebaseapp.com",
-  projectId: "mathmaster-pri",
-  storageBucket: "mathmaster-pri.firebasestorage.app",
-  messagingSenderId: "784442354442",
-  appId: "1:784442354442:web:3760b6b9062420651228f3",
-  measurementId: "G-JK1YWQ8ZY7"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 let app = null;
@@ -32,14 +31,17 @@ const initFirebase = () => {
     return;
   }
 
+  // التحقق من وجود متغيرات البيئة قبل المتابعة
+  if (!PERMANENT_CONFIG.apiKey || !PERMANENT_CONFIG.projectId) {
+    initializationError = "Firebase config missing. Check your .env file.";
+    console.error("❌ Firebase config missing. Make sure .env file exists with VITE_FIREBASE_* variables.");
+    return;
+  }
+
   try {
-    // تهيئة التطبيق
     app = initializeApp(PERMANENT_CONFIG);
     
-    // محاولة تهيئة قاعدة البيانات باستخدام initializeFirestore للتحكم الأكبر
     try {
-      // نستخدم initializeFirestore بدلاً من getFirestore لتجنب بعض الأخطاء التلقائية
-      // ignoreUndefinedProperties: true يساعد في تجنب الأخطاء عند تمرير قيم undefined
       db = initializeFirestore(app, {
          ignoreUndefinedProperties: true
       });
@@ -47,11 +49,9 @@ const initFirebase = () => {
     } catch (e: any) {
       initializationError = `Firestore Init Failed: ${e.message}`;
       console.error("❌ Firestore Init Failed:", e);
-      // في حالة الفشل، نجعل db null ليتم استخدام الوضع المحلي
       db = null;
     }
 
-    // محاولة تهيئة التخزين
     try {
       storage = getStorage(app);
       console.log("✅ Storage Initialized");
@@ -66,22 +66,18 @@ const initFirebase = () => {
   }
 };
 
-// تنفيذ التهيئة
 initFirebase();
 
 export { db, storage };
 
-// دالة لاسترجاع الخطأ لعرضه في لوحة التحكم
 export const getFirebaseInitError = () => {
     return initializationError;
 };
 
-// دالة للتحقق من حالة الاتصال
 export const isOnlineMode = () => {
   return db !== null;
 };
 
-// هل نستخدم الإعدادات الافتراضية؟ نعم، إذا كان الوضع غير المتصل مفعلاً
 export const isUsingDefaultConfig = () => {
   return FORCE_OFFLINE;
 };

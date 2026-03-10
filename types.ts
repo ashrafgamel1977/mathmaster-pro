@@ -1,5 +1,31 @@
 
-import React, { ReactNode } from 'react';
+// --- Shared UI Types ---
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+// --- User Role & Auth Types ---
+export type UserRole = 'teacher' | 'student' | 'parent' | 'assistant';
+
+export interface CurrentUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  // Student-specific (optional when teacher/parent)
+  studentCode?: string;
+  yearId?: string;
+  groupId?: string;
+  score?: number;
+  points?: number;
+  avatar?: string;
+  status?: 'active' | 'pending';
+  badges?: Badge[];
+  streaks?: number;
+  deviceIds?: string[];
+  isPaid?: boolean;
+  scoreHistory?: number[];
+  // Assistant-specific
+  permissions?: AppView[];
+  code?: string;
+}
 
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
@@ -24,7 +50,24 @@ export enum AppView {
   REWARDS = 'REWARDS',
   CONTROL_PANEL = 'CONTROL_PANEL',
   SECTIONS = 'SECTIONS',
-  BATTLE_ARENA = 'BATTLE_ARENA'
+  BATTLE_ARENA = 'BATTLE_ARENA',
+  COURSES = 'COURSES'
+}
+
+export interface CourseModule {
+  id: string;
+  title: string;
+  items: string[]; // IDs of VideoLessons or EducationalSources
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  yearId: string;
+  thumbnailUrl?: string;
+  modules: CourseModule[];
+  createdAt: string;
 }
 
 export type PortalTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'slate' | 'violet';
@@ -104,18 +147,18 @@ export interface Student {
   lastReadNotificationId?: string;
   lastSpinDate?: string;
   preferences?: StudentPreferences;
-  lastReportDate?: string; 
-  subjectScores?: Record<string, number>; 
-  completedLessons?: string[]; 
+  lastReportDate?: string;
+  subjectScores?: Record<string, number>;
+  completedLessons?: string[];
 }
 
 export interface Year { id: string; name: string; }
-export interface Group { 
-  id: string; 
-  name: string; 
-  yearId: string; 
-  time: string; 
-  joinCode: string; 
+export interface Group {
+  id: string;
+  name: string;
+  yearId: string;
+  time: string;
+  joinCode: string;
   whatsappLink?: string;
   type: 'center' | 'online';
   gender: 'boys' | 'girls' | 'mixed';
@@ -130,17 +173,17 @@ export interface Question {
   options?: string[];
   correctAnswer: string | number;
   points: number;
-  branch?: string; 
+  branch?: string;
 }
 
-export interface Quiz { 
-  id: string; 
-  title: string; 
-  yearId: string; 
-  date: string; 
-  type: string; 
-  questions?: Question[]; 
-  duration?: number; 
+export interface Quiz {
+  id: string;
+  title: string;
+  yearId: string;
+  date: string;
+  type: string;
+  questions?: Question[];
+  duration?: number;
   externalLink?: string;
   fileUrl?: string;
 }
@@ -153,19 +196,19 @@ export interface QuestionAttempt {
   isCorrect: boolean;
 }
 
-export interface QuizResult { 
-  id: string; 
-  studentId: string; 
-  quizId: string; 
-  quizTitle: string; 
-  score: number; 
-  status: 'pending' | 'graded'; 
-  date: string; 
-  handwrittenUrl?: string; 
-  feedback?: string; 
-  isCheatSuspected?: boolean; 
-  cheatWarnings?: number; 
-  attempts?: QuestionAttempt[]; 
+export interface QuizResult {
+  id: string;
+  studentId: string;
+  quizId: string;
+  quizTitle: string;
+  score: number;
+  status: 'pending' | 'graded';
+  date: string;
+  handwrittenUrl?: string;
+  feedback?: string;
+  isCheatSuspected?: boolean;
+  cheatWarnings?: number;
+  attempts?: QuestionAttempt[];
 }
 
 export interface Assignment {
@@ -187,16 +230,16 @@ export interface AssignmentAttachment {
   url: string;
 }
 
-export interface AssignmentSubmission { 
-  id: string; 
-  assignmentId: string; 
-  studentId: string; 
-  studentName: string; 
-  fileUrl: string; 
-  grade?: number; 
-  status: 'pending' | 'graded'; 
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  fileUrl: string;
+  grade?: number;
+  status: 'pending' | 'graded';
   feedback?: string;
-  audioFeedback?: string; 
+  audioFeedback?: string;
 }
 
 export interface Rating {
@@ -223,8 +266,8 @@ export interface EducationalSource {
   ratings?: Rating[];
   nextSourceId?: string;
   textContent?: string;
-  term?: '1' | '2'; 
-  subject?: string; 
+  term?: '1' | '2';
+  subject?: string;
   folderId?: string;
 }
 
@@ -261,20 +304,20 @@ export interface ChatMessage {
 export interface VideoLesson {
   id: string;
   title: string;
-  youtubeUrl: string; 
-  provider?: 'youtube' | 'bunny' | 'native'; 
+  youtubeUrl: string;
+  provider?: 'youtube' | 'bunny' | 'native';
   yearId: string;
   uploadDate: string;
   thumbnailUrl?: string;
-  term?: '1' | '2'; 
-  subject?: string; 
+  term?: '1' | '2';
+  subject?: string;
   folderId?: string;
 }
 
 export interface VideoNote {
   id: string;
   videoId: string;
-  timestamp: number; 
+  timestamp: number;
   text: string;
   createdAt: string;
 }
@@ -316,16 +359,17 @@ export interface AppNotification {
   targetYearId?: string;
   timestamp: string;
   isRead: boolean;
+  isPush?: boolean;
 }
 
 export interface BrandingSettings {
   primaryColor: string;
   secondaryColor: string;
-  fontFamily: AppFont; 
+  fontFamily: AppFont;
   logoUrl?: string;
   heroImageUrl?: string;
   faviconUrl?: string;
-  sidebarGradient?: string; 
+  sidebarGradient?: string;
 }
 
 export interface ContentTextSettings {
@@ -358,10 +402,10 @@ export interface PlatformSettings {
   platformName: string;
   teacherSpecialization: TeacherSpecialization; // New
   branches: string[]; // New: Dynamic subjects (e.g. ['Algebra', 'Geometry'] or ['Grammar', 'Reading'])
-  
-  adminCode: string; 
+
+  adminCode: string;
   studentWelcomeMsg: string;
-  parentWelcomeMsg: string;  
+  parentWelcomeMsg: string;
   protectionEnabled: boolean;
   watermarkEnabled: boolean;
   watermarkText: string;
@@ -380,7 +424,7 @@ export interface PlatformSettings {
   examMode: boolean;
   integrityMode: boolean;
   maxDevicesPerStudent: number;
-  
+
   subscriptionEnabled: boolean;
   paymentInstructions?: string;
 
@@ -388,9 +432,9 @@ export interface PlatformSettings {
   viewIcons?: Record<string, string>;
   enabledViews?: string[];
   customSections?: CustomSection[];
-  
+
   branding: BrandingSettings;
   contentTexts: ContentTextSettings;
-  dashboardWidgets?: DashboardWidgets; 
-  featureConfig?: FeatureConfig; 
+  dashboardWidgets?: DashboardWidgets;
+  featureConfig?: FeatureConfig;
 }
