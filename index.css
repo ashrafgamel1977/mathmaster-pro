@@ -18,9 +18,13 @@ body {
   
   /* PWA Optimizations */
   overscroll-behavior-y: none; /* يمنع "نطاطية" الصفحة عند السحب في الموبايل */
-  -webkit-tap-highlight-color: transparent; /* يزيل الوميض الأزرق المزعج عند النقر */
-  touch-action: manipulation; /* يحسن استجابة اللمس */
+  touch-action: manipulation; /* يحسن استجابة اللمس ويمنع تأخير 300ms */
   user-select: none; /* يمنع تحديد النصوص بشكل عام ليعطي شعور التطبيق */
+}
+
+/* Remove tap highlight globally for mobile Safari/Chrome */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* السماح بتحديد النص فقط داخل حقول الكتابة والمحتوى التعليمي */

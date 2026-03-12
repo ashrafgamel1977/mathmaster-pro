@@ -409,6 +409,7 @@ export interface PlatformSettings {
   protectionEnabled: boolean;
   watermarkEnabled: boolean;
   watermarkText: string;
+  darkMode: boolean;
   portalTheme: PortalTheme;
   portalLayout: PortalLayout;
   liveSessionActive: boolean;

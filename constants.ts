@@ -15,6 +15,7 @@ export const INITIAL_SETTINGS: PlatformSettings = {
     watermarkEnabled: true,
     watermarkText: 'MathMaster Property',
     portalTheme: 'indigo',
+    darkMode: true,
     portalLayout: 'modern',
     liveSessionActive: false,
     liveSessionLink: '',

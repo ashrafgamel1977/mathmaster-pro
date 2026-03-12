@@ -59,6 +59,14 @@ const App: React.FC = () => {
   // ─── Tenant Hook ───
   const { tenant, isLoading: isTenantLoading, isExpired, tenantSettings } = useTenant();
 
+  // ─── Auth Hook ───
+  const { currentUser, setCurrentUser, handleUnifiedLogin, handleLogout, loadPersistedUser } = useAuth({
+    isDemoMode, addToast,
+  });
+
+  // Load persisted user on first render
+  React.useEffect(() => { loadPersistedUser(); }, []);
+
   // ─── Data Hook ───
   const {
     students, years, groups, quizzes, assignments, submissions, results,
@@ -66,18 +74,10 @@ const App: React.FC = () => {
     schedules, formulas, folders, courses, videoViews, settings: rawSettings,
     setStudents, setYears, setGroups, setSettings,
     persistData, handleVideoProgress,
-  } = useDataManager(isDemoMode, addToast);
+  } = useDataManager(isDemoMode, addToast, currentUser);
 
   // دمج tenant branding مع الـ settings
   const settings = { ...rawSettings, ...tenantSettings };
-
-  // ─── Auth Hook ───
-  const { currentUser, setCurrentUser, handleUnifiedLogin, handleLogout, loadPersistedUser } = useAuth({
-    students, assistants, years, settings, isDemoMode, persistData, addToast,
-  });
-
-  // Load persisted user on first render
-  React.useEffect(() => { loadPersistedUser(); }, []);
 
   // Tenant expired or not found
   if (isExpired) {
