@@ -12,7 +12,7 @@ import AssignmentsView from './views/Assignments';
 import QuizGenerator from './views/QuizGenerator';
 import LiveClass from './views/LiveClass';
 import FilesView from './views/Files';
-import CoursesView from './views/Courses';
+import CoursesView from './views/CoursesView';
 import Management from './views/Management';
 import QuizResults from './views/QuizResults';
 import Settings from './views/Settings';
@@ -26,7 +26,7 @@ import Registration from './views/Registration';
 import AdminControlPanel from './views/AdminControlPanel';
 import Schedules from './views/Schedules';
 import Sections from './views/Sections';
-import QuestionBank from './views/QuestionBank';
+import QuestionBank from './views/QuestionBankView';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -118,7 +118,7 @@ const App: React.FC = () => {
               };
               persistData('students', newStudent, 'save');
               addToast('تم إرسال طلب التسجيل بنجاح، يمكنك الدخول الآن', 'success');
-              handleUnifiedLogin('student', newStudent.studentCode || 'PENDING');
+              handleUnifiedLogin('student', newStudent.studentCode || 'PENDING', [...students, newStudent], settings);
             }}
             onBack={() => setCurrentView(AppView.DASHBOARD)}
             teacherName={settings.teacherName}
@@ -133,7 +133,7 @@ const App: React.FC = () => {
           teacherName={settings.teacherName}
           platformName={settings.platformName}
           settings={settings}
-          onUnifiedLogin={handleUnifiedLogin}
+          onUnifiedLogin={(r, c) => handleUnifiedLogin(r, c, students, settings)}
           onStudentRegister={() => setCurrentView(AppView.REGISTRATION)}
         />
         <InstallPWA />
