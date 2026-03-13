@@ -26,6 +26,7 @@ import Registration from './views/Registration';
 import AdminControlPanel from './views/AdminControlPanel';
 import Schedules from './views/Schedules';
 import Sections from './views/Sections';
+import QuestionBank from './views/QuestionBank';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -326,6 +327,14 @@ const App: React.FC = () => {
           />
         );
 
+      case AppView.QUESTION_BANK:
+        return (
+          <QuestionBank 
+            years={years}
+            settings={settings}
+          />
+        );
+
       case AppView.LIVE_CLASS:
         return (
           <LiveClass
@@ -379,6 +388,7 @@ const App: React.FC = () => {
         return (
           <QuizResults
             results={results} students={students} notifications={notifications} notation={settings.mathNotation}
+            settings={settings}
             onIssueCertificate={() => { }}
             onUpdateResult={(id, s, f) => { persistData('results', { id, score: s, feedback: f, status: 'graded' }, 'update'); addToast('تم الرصد', 'success'); }}
           />

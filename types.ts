@@ -51,7 +51,8 @@ export enum AppView {
   CONTROL_PANEL = 'CONTROL_PANEL',
   SECTIONS = 'SECTIONS',
   BATTLE_ARENA = 'BATTLE_ARENA',
-  COURSES = 'COURSES'
+  COURSES = 'COURSES',
+  QUESTION_BANK = 'QUESTION_BANK'
 }
 
 export interface CourseModule {
@@ -174,6 +175,7 @@ export interface Question {
   correctAnswer: string | number;
   points: number;
   branch?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 export interface Quiz {
@@ -194,6 +196,7 @@ export interface QuestionAttempt {
   userAnswer: string;
   correctAnswer: string;
   isCorrect: boolean;
+  topic?: string;
 }
 
 export interface QuizResult {
@@ -428,6 +431,12 @@ export interface PlatformSettings {
 
   subscriptionEnabled: boolean;
   paymentInstructions?: string;
+
+  // WhatsApp API Settings
+  whatsappProvider?: 'none' | 'ultramsg' | 'meta' | 'callmebot';
+  whatsappToken?: string;
+  whatsappInstance?: string;
+  whatsappPhoneFrom?: string;
 
   viewLabels?: Record<string, string>;
   viewIcons?: Record<string, string>;
