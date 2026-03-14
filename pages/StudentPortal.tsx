@@ -298,7 +298,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
       <aside className={`hidden lg:flex w-72 border-l border-white/5 h-screen sticky top-0 flex-col z-20 shadow-[4px_0_40px_rgba(0,0,0,0.5)] ${getSidebarThemeClasses()}`}>
         <div className="p-8 border-b border-white/5 mb-4 bg-gradient-to-b from-white/5 to-transparent">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-600 text-white rounded-xl flex items-center justify-center text-xl font-black shadow-[0_0_15px_rgba(245,158,11,0.3)]">∑</div>
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-600 text-white rounded-xl flex items-center justify-center text-xl font-black shadow-[0_0_15px_rgba(245,158,11,0.3)] overflow-hidden p-0.5">
+               <img src="/icons/icon-192x192.png" className="w-full h-full object-cover rounded-lg" alt="Logo" />
+            </div>
             <div>
               <h1 className="font-black text-white text-lg leading-none">{settings.platformName}</h1>
               <span className="text-[10px] font-bold text-slate-500">Student Portal</span>
@@ -344,7 +346,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
         {/* Mobile Header */}
         <div className={`lg:hidden flex items-center justify-between p-4 border-b border-white/5 ${getSidebarThemeClasses()}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-600 text-white rounded-lg flex items-center justify-center font-black">∑</div>
+            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-600 text-white rounded-lg flex items-center justify-center font-black overflow-hidden p-[1px]">
+               <img src="/icons/icon-192x192.png" className="w-full h-full object-cover rounded-md" alt="Logo" />
+            </div>
             <h1 className="font-black text-white text-sm">{settings.platformName}</h1>
           </div>
           <button onClick={onBack} className="w-8 h-8 bg-white/5 text-rose-400 rounded-lg flex items-center justify-center"><LogOut size={16} /></button>

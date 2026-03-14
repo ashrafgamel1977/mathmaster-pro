@@ -150,7 +150,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, settings, logge
         {settings.branding?.logoUrl ? (
            <img src={settings.branding.logoUrl} className="w-10 h-10 object-contain rounded-xl" alt="Logo" />
         ) : (
-           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200" style={{ backgroundColor: primaryColor }}>∑</div>
+           <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 overflow-hidden bg-white p-0.5" style={{ borderColor: primaryColor, borderWidth: '1px' }}>
+               <img src="/icons/icon-192x192.png" className="w-full h-full object-cover rounded-lg" alt="Platform Logo" />
+           </div>
         )}
         <div>
             <h1 className="font-black text-slate-800 text-sm leading-tight">{settings.platformName}</h1>

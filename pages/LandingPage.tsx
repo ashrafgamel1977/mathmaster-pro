@@ -105,8 +105,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ teacherName, platformName, se
                 height="160"
               />
             ) : (
-              <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-full flex items-center justify-center bg-[#0f172a] border-4 border-amber-500/50 shadow-2xl">
-                <span className="text-5xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-br from-amber-200 to-orange-500 font-black">∑</span>
+              <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-[2.5rem] flex items-center justify-center bg-[#0f172a] border-4 border-amber-500/50 shadow-2xl overflow-hidden p-1">
+                <img src="/icons/icon-512x512.png" className="w-full h-full object-cover rounded-[2rem]" alt="MathMaster Logo" />
               </div>
             )}
           </div>
