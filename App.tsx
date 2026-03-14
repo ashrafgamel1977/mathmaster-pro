@@ -4,29 +4,29 @@ import { AppView, ToastType } from './types';
 
 // Views
 import LandingPage from './pages/LandingPage';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/DashboardMain';
 import StudentPortal from './pages/StudentPortal';
 import ParentPortal from './pages/ParentPortal';
 import StudentList from './components/StudentList';
-import AssignmentsView from './pages/Assignments';
+import AssignmentsView from './pages/AssignmentsPage';
 import QuizGenerator from './pages/QuizGenerator';
 import LiveClass from './pages/LiveClass';
-import FilesView from './pages/Files';
-import CoursesView from './pages/Courses';
-import Management from './pages/Management';
+import FilesView from './pages/FilesPage';
+import CoursesView from './pages/CoursesPage';
+import Management from './pages/ManagementPage';
 import QuizResults from './pages/QuizResults';
-import Settings from './pages/Settings';
-import ChatRoom from './pages/ChatRoom';
+import Settings from './pages/SettingsPage';
+import ChatRoom from './pages/ChatRoomPage';
 import TestCenter from './pages/TestCenter';
 import LaunchGuide from './pages/LaunchGuide';
-import Leaderboard from './pages/Leaderboard';
-import Notifications from './pages/Notifications';
-import Formulas from './pages/Formulas';
-import Registration from './pages/Registration';
+import Leaderboard from './pages/LeaderboardPage';
+import Notifications from './pages/NotificationsPage';
+import Formulas from './pages/FormulasPage';
+import Registration from './pages/RegistrationPage';
 import AdminControlPanel from './pages/AdminControlPanel';
-import Schedules from './pages/Schedules';
-import Sections from './pages/Sections';
-import QuestionBank from './pages/QuestionBank';
+import Schedules from './pages/SchedulesPage';
+import Sections from './pages/SectionsPage';
+import QuestionBank from './pages/QuestionBankPage';
 
 // Components
 import Sidebar from './components/Sidebar';
